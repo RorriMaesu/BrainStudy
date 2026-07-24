@@ -45,10 +45,10 @@ export const SCENE_REGIONS: SceneRegion[] = [
   { id: "hippocampus", position: [0.22, -0.05, -0.23], layers: ["deep", "systems"], laterality: "bilateral", priority: 1, labelViews: ["medial", "inferior"], bestView: "medial" },
   { id: "amygdala", position: [0.25, 0.30, -0.23], layers: ["deep", "systems"], laterality: "bilateral", priority: 2, labelViews: ["medial", "anterior", "inferior"], bestView: "medial" },
   { id: "basal-ganglia", position: [0.22, 0.11, 0.05], layers: ["deep", "systems"], laterality: "bilateral", priority: 1, labelViews: ["medial", "anterior", "superior"], bestView: "medial" },
-  { id: "cerebellum", position: [0.25, -0.58, -0.38], layers: ["surface", "deep", "systems"], laterality: "bilateral", priority: 1, labelViews: ["posterior", "inferior"], bestView: "posterior" },
-  { id: "midbrain", position: [0, -0.08, -0.25], layers: ["deep", "systems"], laterality: "midline", priority: 2, labelViews: ["medial", "posterior", "inferior"], bestView: "medial" },
-  { id: "pons", position: [0, -0.10, -0.39], layers: ["deep", "systems"], laterality: "midline", priority: 2, labelViews: ["medial", "posterior", "inferior"], bestView: "medial" },
-  { id: "medulla", position: [0, -0.10, -0.56], layers: ["surface", "deep", "systems"], laterality: "midline", priority: 1, labelViews: ["posterior", "inferior"], bestView: "inferior" },
+  { id: "cerebellum", position: [0, 0.38, -0.28], layers: ["surface", "deep", "systems"], laterality: "bilateral", priority: 1, labelViews: ["posterior", "inferior"], bestView: "posterior" },
+  { id: "midbrain", position: [0, -0.09, -0.06], layers: ["deep", "systems"], laterality: "midline", priority: 2, labelViews: ["medial", "posterior", "inferior"], bestView: "medial" },
+  { id: "pons", position: [0, -0.01, -0.25], layers: ["deep", "systems"], laterality: "midline", priority: 2, labelViews: ["medial", "posterior", "inferior"], bestView: "medial" },
+  { id: "medulla", position: [0, 0.12, -0.55], layers: ["surface", "deep", "systems"], laterality: "midline", priority: 1, labelViews: ["posterior", "inferior"], bestView: "inferior" },
   { id: "ventricles", position: [0.11, -0.02, 0.15], layers: ["deep", "systems"], laterality: "bilateral", priority: 2, labelViews: ["medial", "superior"], bestView: "medial" },
 ];
 

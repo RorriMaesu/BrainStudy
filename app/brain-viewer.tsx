@@ -523,7 +523,7 @@ function Cerebellum({
     <AnatomicalModelPart
       id="cerebellum"
       modelPath="/models/cerebellum.glb"
-      position={[0, -0.52, -0.36]}
+      position={[0, 0, 0]}
       selectedId={selectedId}
       onSelect={onSelect}
     />
@@ -546,14 +546,14 @@ function Brainstem({
           <AnatomicalModelPart
             id="midbrain"
             modelPath="/models/midbrain.glb"
-            position={[0, -0.06, -0.24]}
+            position={[0, 0, 0]}
             selectedId={selectedId}
             onSelect={onSelect}
           />
           <AnatomicalModelPart
             id="pons"
             modelPath="/models/pons.glb"
-            position={[0, -0.10, -0.39]}
+            position={[0, 0, 0]}
             selectedId={selectedId}
             onSelect={onSelect}
           />
@@ -562,7 +562,7 @@ function Brainstem({
       <AnatomicalModelPart
         id="medulla"
         modelPath="/models/medulla.glb"
-        position={[0, -0.10, -0.56]}
+        position={[0, 0, 0]}
         selectedId={selectedId}
         onSelect={onSelect}
       />
