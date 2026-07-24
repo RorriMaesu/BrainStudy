@@ -50,7 +50,7 @@ function encodeGeometryToGLB(positions, normals, indices, meshName = "Mesh") {
   Buffer.from(indexArray.buffer).copy(binBuffer, offset);
 
   const gltfJSON = {
-    asset: { version: "2.0", generator: "BrainStudy Pure Anatomy Generator" },
+    asset: { version: "2.0", generator: "BrainStudy Anatomical Generator" },
     scene: 0,
     scenes: [{ nodes: [0] }],
     nodes: [{ mesh: 0, name: meshName }],
@@ -160,20 +160,21 @@ function computeVertexNormals(positions, indices) {
   return normals;
 }
 
-// Generate Parametric Sphere Mesh
+// Generate Parametric Sphere Mesh (u = 0..PI, v = 0..2PI)
 function generateSphereMesh(uSegments, vSegments, transformFn) {
   const positions = [];
   const grid = [];
 
   for (let uIdx = 0; uIdx <= uSegments; uIdx++) {
     const uRow = [];
-    const u = (uIdx / uSegments) * Math.PI; // 0 to PI
+    const u = (uIdx / uSegments) * Math.PI; // 0 (top/Superior +Z) to PI (bottom/Inferior -Z)
     for (let vIdx = 0; vIdx <= vSegments; vIdx++) {
-      const v = (vIdx / vSegments) * Math.PI * 2; // 0 to 2PI
+      const v = (vIdx / vSegments) * Math.PI * 2; // 0 to 2PI around Z-axis
 
-      const sx = Math.sin(u) * Math.cos(v);
-      const sy = Math.cos(u);
-      const sz = Math.sin(u) * Math.sin(v);
+      // Unit sphere where Z is vertical (Superior/Inferior), X is Left/Right, Y is Anterior/Posterior
+      const sx = Math.sin(u) * Math.cos(v); // Left / Right
+      const sy = Math.sin(u) * Math.sin(v); // Anterior / Posterior
+      const sz = Math.cos(u);               // Superior / Inferior
 
       const [px, py, pz] = transformFn(sx, sy, sz, u, v);
       uRow.push(positions.length / 3);
@@ -199,22 +200,22 @@ function generateSphereMesh(uSegments, vSegments, transformFn) {
   return { positions, normals, indices };
 }
 
-// Generate Parametric Cylinder Mesh
-function generateCylinderMesh(radialSegments, heightSegments, transformFn) {
+// Generate Parametric Vertical Cylinder Mesh along Z-axis (height along Z)
+function generateZAxisCylinderMesh(radialSegments, heightSegments, transformFn) {
   const positions = [];
   const grid = [];
 
   for (let hIdx = 0; hIdx <= heightSegments; hIdx++) {
     const hRow = [];
-    const h = (hIdx / heightSegments) - 0.5; // -0.5 to 0.5
+    const zNorm = (hIdx / heightSegments) - 0.5; // -0.5 (Inferior -Z) to +0.5 (Superior +Z)
     for (let rIdx = 0; rIdx <= radialSegments; rIdx++) {
-      const theta = (rIdx / radialSegments) * Math.PI * 2; // 0 to 2PI
+      const theta = (rIdx / radialSegments) * Math.PI * 2; // 0 to 2PI around Z-axis
 
-      const cx = Math.cos(theta);
-      const cy = h;
-      const cz = Math.sin(theta);
+      const cx = Math.cos(theta); // Bilateral X
+      const cy = Math.sin(theta); // Anteroposterior Y
+      const cz = zNorm;           // Superoinferior Z
 
-      const [px, py, pz] = transformFn(cx, cy, cz, h, theta);
+      const [px, py, pz] = transformFn(cx, cy, cz, zNorm, theta);
       hRow.push(positions.length / 3);
       positions.push(px, py, pz);
     }
@@ -238,94 +239,121 @@ function generateCylinderMesh(radialSegments, heightSegments, transformFn) {
   return { positions, normals, indices };
 }
 
-// 1. Cerebellum Mesh
+// 1. Cerebellum Mesh (X = Bilateral, Y = Anteroposterior, Z = Superoinferior)
 function createCerebellum() {
   return generateSphereMesh(160, 120, (sx, sy, sz) => {
-    let rx = sx * 0.42;
-    let ry = sy * 0.28;
-    let rz = sz * 0.26;
+    let rx = sx * 0.38; // Bilateral width
+    let ry = sy * 0.28; // Anteroposterior depth
+    let rz = sz * 0.24; // Superoinferior height
 
-    // Vermis groove at x=0
-    const vermisIndent = Math.exp(-Math.pow(sx * 4.5, 2)) * 0.04;
-    rz -= vermisIndent;
+    // Anterior notch facing +Y (wrapping around brainstem/4th ventricle)
+    if (sy > 0) {
+      const notchIndent = Math.exp(-Math.pow(sx * 4.5, 2)) * 0.06;
+      ry -= notchIndent;
+    }
 
-    // Folial folding micro-geometry
+    // Transverse folial sulci micro-geometry running along X-axis
     const folialFreq = 48.0;
-    const folialDepth = 0.015 * Math.sin(sy * folialFreq) * Math.cos(sz * 12.0);
+    const folialDepth = 0.012 * Math.sin(sz * folialFreq) * Math.cos(sy * 10.0);
     
-    if (sy < 0) ry *= 0.85;
+    // Inferior flattening & cerebellar tonsil rounding (-Z)
+    if (sz < 0) {
+      rz *= 0.88;
+      // Tonsillar swellings
+      if (Math.abs(sx) > 0.08 && Math.abs(sx) < 0.22 && sy < 0) {
+        rz -= Math.exp(-Math.pow((Math.abs(sx) - 0.15) * 12.0, 2)) * 0.025;
+      }
+    }
 
     const px = rx * (1 + folialDepth);
-    const py = ry + folialDepth * 0.5;
-    const pz = rz * (1 + folialDepth);
+    const py = ry * (1 + folialDepth);
+    const pz = rz + folialDepth * 0.4;
 
     return [px, py, pz];
   });
 }
 
-// 2. Midbrain Mesh
+// 2. Midbrain Mesh (Vertical cylinder along Z-axis)
 function createMidbrain() {
-  return generateCylinderMesh(64, 32, (cx, cy, cz) => {
-    let radius = cy > 0 ? 0.14 : 0.12;
+  return generateZAxisCylinderMesh(64, 32, (cx, cy, cz, zNorm) => {
+    // Rostral brainstem: slightly larger superiorly (+Z)
+    const radius = 0.13 + zNorm * 0.02;
     let px = cx * radius;
-    let py = cy * 0.16;
-    let pz = cz * radius;
+    let py = cy * radius;
+    let pz = cz * 0.16; // height along Z
 
-    if (pz > 0) {
-      const peduncle = Math.sin(Math.abs(px) * 15.0) * 0.025;
-      pz += peduncle;
+    // Anterior (+Y): Cerebral Peduncles (Crus Cerebri) V-shaped flare
+    if (py > 0) {
+      const peduncleFlare = Math.sin(Math.abs(px) * 14.0) * 0.03;
+      py += peduncleFlare;
+      // Interpeduncular fossa midline indent
+      if (Math.abs(px) < 0.035) {
+        py -= 0.015;
+      }
     } else {
-      const colliculusY = Math.sin(py * 35.0);
+      // Posterior (-Y): Tectal Plate (Colliculi)
+      const colliculusZ = Math.sin(pz * 35.0);
       const colliculusX = Math.cos(px * 25.0);
-      if (colliculusY > 0 && Math.abs(px) < 0.09) {
-        pz -= 0.02 * colliculusY * colliculusX;
+      if (colliculusZ > 0 && Math.abs(px) < 0.09) {
+        py -= 0.02 * colliculusZ * colliculusX;
       }
     }
     return [px, py, pz];
   });
 }
 
-// 3. Pons Mesh
+// 3. Pons Mesh (Vertical cylinder along Z-axis with prominent anterior bulge)
 function createPons() {
   return generateSphereMesh(96, 64, (sx, sy, sz) => {
-    let rx = sx * 0.18;
-    let ry = sy * 0.14;
-    let rz = sz * 0.14;
+    let rx = sx * 0.18; // Bilateral width with MCP flare
+    let ry = sy * 0.14; // Anteroposterior depth
+    let rz = sz * 0.14; // Superoinferior height
 
-    if (sz > 0) {
-      const basilar = Math.exp(-Math.pow(sx * 25.0, 2)) * 0.022;
-      rz -= basilar;
+    // Prominent anterior pontine bulge (+Y)
+    if (sy > 0) {
+      ry *= 1.35;
+      // Basilar groove down anterior midline (x=0, y>0)
+      const basilar = Math.exp(-Math.pow(sx * 22.0, 2)) * 0.022;
+      ry -= basilar;
+    } else {
+      // Posterior flattening facing 4th ventricle (-Y)
+      ry *= 0.75;
     }
 
-    const transverse = Math.sin(sy * 50.0) * 0.004;
-    rz += transverse;
+    // Transverse pontine fiber ridges running horizontally along X-axis
+    const transverse = Math.sin(sz * 50.0) * 0.005;
+    ry += transverse;
 
     return [rx, ry, rz];
   });
 }
 
-// 4. Medulla Mesh
+// 4. Medulla Oblongata Mesh (Vertical cylinder along Z-axis tapering caudally)
 function createMedulla() {
-  return generateCylinderMesh(64, 40, (cx, cy, cz) => {
-    // Tapered cylinder: top radius 0.10, bottom radius 0.065
-    const radius = 0.0825 + cy * 0.035;
+  return generateZAxisCylinderMesh(64, 40, (cx, cy, cz, zNorm) => {
+    // Tapered cylinder along Z: top (+Z) radius 0.10, bottom (-Z) radius 0.065
+    const radius = 0.0825 + zNorm * 0.035;
     let px = cx * radius;
-    let py = cy * 0.28;
-    let pz = cz * radius;
+    let py = cy * radius;
+    let pz = cz * 0.28; // height along Z (-0.14 to +0.14)
 
-    if (pz > 0) {
-      const fissure = Math.exp(-Math.pow(px * 35.0, 2)) * 0.012;
-      pz -= fissure;
+    // Anterior (+Y): Anterior Median Fissure & Pyramids
+    if (py > 0) {
+      // Anterior Median Fissure (midline indent at x=0)
+      const fissure = Math.exp(-Math.pow(px * 35.0, 2)) * 0.014;
+      py -= fissure;
 
-      const pyramid = Math.exp(-Math.pow((Math.abs(px) - 0.04) * 25.0, 2)) * 0.015;
-      pz += pyramid;
+      // Bilateral Anterior Pyramids (flanking fissure)
+      const pyramid = Math.exp(-Math.pow((Math.abs(px) - 0.038) * 25.0, 2)) * 0.018;
+      py += pyramid;
     }
 
-    if (Math.abs(px) > 0.045 && Math.abs(px) < 0.085 && py > -0.04 && py < 0.06) {
-      const olive = Math.cos((px > 0 ? px - 0.065 : px + 0.065) * 40.0) * Math.cos(py * 25.0) * 0.014;
+    // Anterolateral Olives (oval swellings at z near 0..+0.06, x near +-0.065, y > 0)
+    if (Math.abs(px) > 0.045 && Math.abs(px) < 0.085 && pz > -0.04 && pz < 0.06 && py > 0) {
+      const olive = Math.cos((px > 0 ? px - 0.065 : px + 0.065) * 40.0) * Math.cos(pz * 25.0) * 0.016;
       if (olive > 0) {
         px += (px > 0 ? 1 : -1) * olive;
-        pz += olive * 0.5;
+        py += olive * 0.6;
       }
     }
 
