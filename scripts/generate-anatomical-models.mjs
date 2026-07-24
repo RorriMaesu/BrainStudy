@@ -117,7 +117,7 @@ function encodeGeometryToGLB(positions, normals, indices, meshName = "Mesh") {
   jsonPad.copy(fileBuffer, fileOffset); fileOffset += jsonPad.length;
 
   fileBuffer.writeUInt32LE(totalBinLength, fileOffset); fileOffset += 4;
-  fileBuffer.writeUInt32LE(0x04504142, fileOffset); fileOffset += 4;
+  fileBuffer.writeUInt32LE(0x004E4942, fileOffset); fileOffset += 4; // 'BIN\0' in Little Endian
   binBuffer.copy(fileBuffer, fileOffset);
 
   return fileBuffer;
