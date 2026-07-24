@@ -273,32 +273,30 @@ function createCerebellum() {
   });
 }
 
-// 2. Midbrain Mesh (Vertical cylinder along Z-axis)
+// 2. Midbrain Mesh (Rostral brainstem, closed smooth mesh)
 function createMidbrain() {
-  return generateZAxisCylinderMesh(64, 32, (cx, cy, cz, zNorm) => {
-    // Rostral brainstem: slightly larger superiorly (+Z)
-    const radius = 0.13 + zNorm * 0.02;
-    let px = cx * radius;
-    let py = cy * radius;
-    let pz = cz * 0.16; // height along Z
+  return generateSphereMesh(96, 64, (sx, sy, sz) => {
+    let rx = sx * (0.13 + sz * 0.02);
+    let ry = sy * (0.13 + sz * 0.02);
+    let pz = sz * 0.09;
 
     // Anterior (+Y): Cerebral Peduncles (Crus Cerebri) V-shaped flare
-    if (py > 0) {
-      const peduncleFlare = Math.sin(Math.abs(px) * 14.0) * 0.03;
-      py += peduncleFlare;
+    if (sy > 0) {
+      const peduncleFlare = Math.sin(Math.abs(sx) * 14.0) * 0.025;
+      ry += peduncleFlare;
       // Interpeduncular fossa midline indent
-      if (Math.abs(px) < 0.035) {
-        py -= 0.015;
+      if (Math.abs(sx) < 0.035) {
+        ry -= 0.012;
       }
     } else {
       // Posterior (-Y): Tectal Plate (Colliculi)
       const colliculusZ = Math.sin(pz * 35.0);
-      const colliculusX = Math.cos(px * 25.0);
-      if (colliculusZ > 0 && Math.abs(px) < 0.09) {
-        py -= 0.02 * colliculusZ * colliculusX;
+      const colliculusX = Math.cos(sx * 25.0);
+      if (colliculusZ > 0 && Math.abs(sx) < 0.09) {
+        ry -= 0.018 * colliculusZ * colliculusX;
       }
     }
-    return [px, py, pz];
+    return [rx, ry, pz];
   });
 }
 
@@ -328,36 +326,52 @@ function createPons() {
   });
 }
 
-// 4. Medulla Oblongata Mesh (Vertical cylinder along Z-axis tapering caudally)
+// 4. Medulla Oblongata Mesh (Closed smooth anatomical model tapering caudally into spinal cord)
 function createMedulla() {
-  return generateZAxisCylinderMesh(64, 40, (cx, cy, cz, zNorm) => {
-    // Tapered cylinder along Z: top (+Z) radius 0.10, bottom (-Z) radius 0.065
-    const radius = 0.0825 + zNorm * 0.035;
-    let px = cx * radius;
-    let py = cy * radius;
-    let pz = cz * 0.28; // height along Z (-0.14 to +0.14)
+  return generateSphereMesh(120, 80, (sx, sy, sz) => {
+    // sz ranges from +1 (superior, pontomedullary junction) to -1 (inferior, spinal cord transition)
+    const t = (1 - sz) * 0.5; // 0 at top, 1 at bottom
 
-    // Anterior (+Y): Anterior Median Fissure & Pyramids
-    if (py > 0) {
-      // Anterior Median Fissure (midline indent at x=0)
-      const fissure = Math.exp(-Math.pow(px * 35.0, 2)) * 0.014;
-      py -= fissure;
+    // Tapering radii from superior pontomedullary junction to caudal spinal cord
+    const baseRx = 0.078 - t * 0.034;
+    const baseRy = 0.072 - t * 0.030;
+    const rz = 0.13; // half-height extent (total height 0.26)
 
-      // Bilateral Anterior Pyramids (flanking fissure)
-      const pyramid = Math.exp(-Math.pow((Math.abs(px) - 0.038) * 25.0, 2)) * 0.018;
-      py += pyramid;
-    }
+    let rx = sx * baseRx;
+    let ry = sy * baseRy;
+    let pz = sz * rz;
 
-    // Anterolateral Olives (oval swellings at z near 0..+0.06, x near +-0.065, y > 0)
-    if (Math.abs(px) > 0.045 && Math.abs(px) < 0.085 && pz > -0.04 && pz < 0.06 && py > 0) {
-      const olive = Math.cos((px > 0 ? px - 0.065 : px + 0.065) * 40.0) * Math.cos(pz * 25.0) * 0.016;
-      if (olive > 0) {
-        px += (px > 0 ? 1 : -1) * olive;
-        py += olive * 0.6;
+    // Subtle posterior caudal inclination matching natural anatomical clivus/foramen magnum axis
+    ry -= (1 - sz) * 0.008;
+
+    // Anterior features (+Y)
+    if (sy > 0) {
+      // Anterior Median Fissure (deep midline groove)
+      const fissure = Math.exp(-Math.pow(sx * 34.0, 2)) * 0.009 * (1 - t * 0.4);
+      ry -= fissure;
+
+      // Bilateral Anterior Pyramids (longitudinal columns flanking fissure)
+      const pyramid = Math.exp(-Math.pow((Math.abs(sx) - 0.030) * 26.0, 2)) * 0.012 * (1 - t * 0.3);
+      ry += pyramid;
+
+      // Anterolateral Olives (inferior olivary swellings on upper half: sz between -0.2 and 0.7)
+      if (sz > -0.25 && sz < 0.75 && Math.abs(sx) > 0.025 && Math.abs(sx) < 0.070) {
+        const zFactor = Math.cos((sz - 0.25) * 3.14); // peak around sz = 0.25
+        if (zFactor > 0) {
+          const olive = Math.cos((Math.abs(sx) - 0.048) * 48.0) * zFactor * 0.011;
+          if (olive > 0) {
+            rx += (sx > 0 ? 1 : -1) * olive;
+            ry += olive * 0.7;
+          }
+        }
       }
+    } else {
+      // Posterior features (-Y): Posterior median sulcus
+      const postSulcus = Math.exp(-Math.pow(sx * 36.0, 2)) * 0.006;
+      ry += postSulcus;
     }
 
-    return [px, py, pz];
+    return [rx, ry, pz];
   });
 }
 

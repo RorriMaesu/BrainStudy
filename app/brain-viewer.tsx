@@ -443,6 +443,7 @@ function AnatomicalModelPart({
   id,
   modelPath,
   position,
+  rotation = [0, 0, 0],
   scale = [1, 1, 1],
   selectedId,
   onSelect,
@@ -450,6 +451,7 @@ function AnatomicalModelPart({
   id: string;
   modelPath: string;
   position: [number, number, number];
+  rotation?: [number, number, number];
   scale?: [number, number, number];
   selectedId: string;
   onSelect: (id: string) => void;
@@ -491,6 +493,7 @@ function AnatomicalModelPart({
     <primitive
       object={clone}
       position={position}
+      rotation={rotation}
       scale={hovered && !selected ? scale.map((v) => v * 1.035) as [number, number, number] : scale}
       onClick={(event: { stopPropagation: () => void }) => {
         event.stopPropagation();
@@ -559,7 +562,7 @@ function Brainstem({
       <AnatomicalModelPart
         id="medulla"
         modelPath="/models/medulla.glb"
-        position={[0, -0.10, -0.55]}
+        position={[0, -0.10, -0.56]}
         selectedId={selectedId}
         onSelect={onSelect}
       />
