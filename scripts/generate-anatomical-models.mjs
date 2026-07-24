@@ -326,52 +326,76 @@ function createPons() {
   });
 }
 
-// 4. Medulla Oblongata Mesh (Closed smooth anatomical model tapering caudally into spinal cord)
+// 4. Medulla Oblongata Mesh (High-detail tapered stalk tapering caudally into spinal cord)
 function createMedulla() {
-  return generateSphereMesh(120, 80, (sx, sy, sz) => {
-    // sz ranges from +1 (superior, pontomedullary junction) to -1 (inferior, spinal cord transition)
-    const t = (1 - sz) * 0.5; // 0 at top, 1 at bottom
-
-    // Tapering radii from superior pontomedullary junction to caudal spinal cord
-    const baseRx = 0.078 - t * 0.034;
-    const baseRy = 0.072 - t * 0.030;
-    const rz = 0.13; // half-height extent (total height 0.26)
-
-    let rx = sx * baseRx;
-    let ry = sy * baseRy;
-    let pz = sz * rz;
-
+  return generateSphereMesh(120, 80, (sx, sy, sz, u, v) => {
+    // Treat 'u' (0 to PI) as a linear progression from top to bottom
+    const t = u / Math.PI; // 0 at superior (top), 1 at inferior (bottom)
+    
+    // Linear mapping for the z-axis to create a cylindrical stalk, NOT cos(u)
+    let pz = (1.0 - 2.0 * t) * 0.14; // total height 0.28 (from 0.14 to -0.14)
+    
+    // Cap function to close the ends (creates a rounded top and bottom)
+    let cap = 1.0;
+    const topCapSize = 0.10; 
+    const bottomCapSize = 0.12;
+    if (t < topCapSize) {
+      cap = Math.sin((t / topCapSize) * (Math.PI / 2));
+    } else if (t > 1.0 - bottomCapSize) {
+      cap = Math.sin(((1.0 - t) / bottomCapSize) * (Math.PI / 2));
+    }
+    
+    // Tapering base radii from superior pontomedullary junction to caudal spinal cord
+    const baseRx = 0.082 - t * 0.038;
+    const baseRy = 0.076 - t * 0.034;
+    
+    // Create the base cylindrical shape
+    let px = Math.cos(v) * baseRx * cap;
+    let py = Math.sin(v) * baseRy * cap;
+    
     // Subtle posterior caudal inclination matching natural anatomical clivus/foramen magnum axis
-    ry -= (1 - sz) * 0.008;
-
-    // Anterior features (+Y)
-    if (sy > 0) {
-      // Anterior Median Fissure (deep midline groove)
-      const fissure = Math.exp(-Math.pow(sx * 34.0, 2)) * 0.009 * (1 - t * 0.4);
-      ry -= fissure;
-
+    py -= t * 0.015;
+    
+    // Apply anatomical features
+    if (py > 0) { // Anterior side
+      const xDist = Math.abs(px);
+      
+      // Anterior Median Fissure (midline groove at x=0)
+      const fissure = Math.exp(-Math.pow(xDist * 38.0, 2)) * 0.012 * (1 - t * 0.4) * cap;
+      py -= fissure;
+      
       // Bilateral Anterior Pyramids (longitudinal columns flanking fissure)
-      const pyramid = Math.exp(-Math.pow((Math.abs(sx) - 0.030) * 26.0, 2)) * 0.012 * (1 - t * 0.3);
-      ry += pyramid;
-
-      // Anterolateral Olives (inferior olivary swellings on upper half: sz between -0.2 and 0.7)
-      if (sz > -0.25 && sz < 0.75 && Math.abs(sx) > 0.025 && Math.abs(sx) < 0.070) {
-        const zFactor = Math.cos((sz - 0.25) * 3.14); // peak around sz = 0.25
+      const pyramid = Math.exp(-Math.pow((xDist - 0.028) * 32.0, 2)) * 0.014 * (1 - t * 0.3) * cap;
+      py += pyramid;
+      
+      // Anterolateral Olives (inferior olivary swellings)
+      if (t > 0.1 && t < 0.6 && xDist > 0.035) {
+        const zFactor = Math.sin(((t - 0.1) / 0.5) * Math.PI); // peak at t=0.35
         if (zFactor > 0) {
-          const olive = Math.cos((Math.abs(sx) - 0.048) * 48.0) * zFactor * 0.011;
+          const olive = Math.exp(-Math.pow((xDist - 0.055) * 42.0, 2)) * zFactor * 0.014 * cap;
           if (olive > 0) {
-            rx += (sx > 0 ? 1 : -1) * olive;
-            ry += olive * 0.7;
+            px += (px > 0 ? 1 : -1) * olive * 0.6; // push outward laterally
+            py += olive * 0.8;                     // push outward anteriorly
           }
         }
       }
-    } else {
-      // Posterior features (-Y): Posterior median sulcus
-      const postSulcus = Math.exp(-Math.pow(sx * 36.0, 2)) * 0.006;
-      ry += postSulcus;
+    } else { // Posterior side
+      const xDist = Math.abs(px);
+      
+      // Posterior median sulcus
+      const postSulcus = Math.exp(-Math.pow(xDist * 45.0, 2)) * 0.008 * cap;
+      py += postSulcus; // indent towards anterior (+Y)
+      
+      // Gracile and Cuneate tubercles
+      if (t < 0.5) {
+        const zFactor = (0.5 - t) / 0.5; // 1 at top, 0 at middle
+        const gracile = Math.exp(-Math.pow((xDist - 0.015) * 55.0, 2)) * 0.006 * zFactor * cap;
+        const cuneate = Math.exp(-Math.pow((xDist - 0.035) * 55.0, 2)) * 0.005 * zFactor * cap;
+        py -= (gracile + cuneate); // bulge posteriorly (-Y)
+      }
     }
-
-    return [rx, ry, pz];
+    
+    return [px, py, pz];
   });
 }
 
