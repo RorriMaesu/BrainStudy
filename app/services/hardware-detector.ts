@@ -218,19 +218,22 @@ export async function detectGPUHardware(): Promise<GPUHardwareInfo> {
     estimatedVRAMGB = 6;
   }
 
-  // 4. Optionally query local server API if available for exact hardware
-  try {
-    const res = await fetch("/api/system/gpu", { cache: "no-store" });
-    if (res.ok) {
-      const data = (await res.json()) as { vramGB?: number; gpuName?: string };
-      if (data && typeof data.vramGB === "number" && data.vramGB > 0) {
-        estimatedVRAMGB = data.vramGB;
-        if (data.gpuName) renderer = data.gpuName;
-        method = "server";
+  // 4. Query local server API ONLY if running in local server mode (skip on static hosts like GitHub Pages)
+  const isStaticHost = typeof window !== "undefined" && (window.location.hostname.endsWith("github.io") || window.location.protocol === "file:");
+  if (!isStaticHost) {
+    try {
+      const res = await fetch("/api/system/gpu", { cache: "no-store" });
+      if (res.ok) {
+        const data = (await res.json()) as { vramGB?: number; gpuName?: string };
+        if (data && typeof data.vramGB === "number" && data.vramGB > 0) {
+          estimatedVRAMGB = data.vramGB;
+          if (data.gpuName) renderer = data.gpuName;
+          method = "server";
+        }
       }
+    } catch (_err) {
+      // Local server hardware endpoint offline or in static preview mode
     }
-  } catch (_err) {
-    // Local server hardware endpoint offline or in static preview mode
   }
 
   const tier = getTierFromVRAM(estimatedVRAMGB);

@@ -35,12 +35,18 @@ export interface OllamaStatusResponse {
 export class OllamaClient {
   private static defaultHost = "http://127.0.0.1:11434";
 
+  private static isStaticDeployment(): boolean {
+    if (typeof window === "undefined") return false;
+    const host = window.location.hostname;
+    return host.endsWith("github.io") || window.location.protocol === "file:";
+  }
+
   /**
    * Check Ollama status directly from browser with fallback to local server route
    */
   static async checkStatus(): Promise<OllamaStatusResponse> {
     try {
-      // Direct browser ping to local Ollama instance
+      // Direct browser ping to local Ollama instance (port 11434)
       const res = await fetch(`${this.defaultHost}/api/tags`, {
         method: "GET",
         signal: AbortSignal.timeout(2000),
@@ -50,7 +56,6 @@ export class OllamaClient {
         const data = (await res.json()) as { models?: OllamaModelTag[] };
         const models: OllamaModelTag[] = data.models || [];
 
-        // Check running models via /api/ps
         let runningModels: OllamaProcessInfo[] = [];
         try {
           const psRes = await fetch(`${this.defaultHost}/api/ps`, { signal: AbortSignal.timeout(1500) });
@@ -59,7 +64,7 @@ export class OllamaClient {
             runningModels = psData.models || [];
           }
         } catch (_err) {
-          // Ignore /api/ps error if unsupported
+          // Ignore /api/ps error
         }
 
         return {
@@ -71,16 +76,19 @@ export class OllamaClient {
         };
       }
     } catch (_err) {
-      // Direct ping failed, query server status proxy route
+      // Direct ping failed
     }
 
-    try {
-      const serverRes = await fetch("/api/system/ollama/status", { cache: "no-store" });
-      if (serverRes.ok) {
-        return (await serverRes.json()) as OllamaStatusResponse;
+    // If not static host, check local server proxy endpoint
+    if (!this.isStaticDeployment()) {
+      try {
+        const serverRes = await fetch("/api/system/ollama/status", { cache: "no-store" });
+        if (serverRes.ok) {
+          return (await serverRes.json()) as OllamaStatusResponse;
+        }
+      } catch (_err) {
+        // Server route unreachable
       }
-    } catch (_err) {
-      // Server route unreachable
     }
 
     return {
@@ -94,6 +102,13 @@ export class OllamaClient {
    * Request local server to launch Ollama application process
    */
   static async launchOllamaServer(): Promise<{ success: boolean; message: string }> {
+    if (this.isStaticDeployment()) {
+      return {
+        success: false,
+        message: "Ollama background launcher requires running BrainStudy locally. Please run 'ollama serve' in your terminal.",
+      };
+    }
+
     try {
       const res = await fetch("/api/system/ollama/launch", {
         method: "POST",
@@ -117,15 +132,22 @@ export class OllamaClient {
     onProgress: (status: string, percent?: number) => void,
   ): Promise<boolean> {
     try {
-      let res: Response;
-      try {
-        res = await fetch("/api/system/ollama/pull", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ model: modelName }),
-        });
-      } catch (_err) {
-        // Direct browser fallback for static hostings (GitHub Pages)
+      let res: Response | undefined;
+
+      if (!this.isStaticDeployment()) {
+        try {
+          const serverRes = await fetch("/api/system/ollama/pull", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ model: modelName }),
+          });
+          if (serverRes.ok) res = serverRes;
+        } catch (_err) {
+          // Ignore server route failure
+        }
+      }
+
+      if (!res || !res.ok) {
         res = await fetch(`${this.defaultHost}/api/pull`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -156,7 +178,7 @@ export class OllamaClient {
               onProgress(json.status, pct);
             }
           } catch (_err) {
-            // Partial JSON chunk
+            // Partial chunk
           }
         }
       }
@@ -186,19 +208,26 @@ export class OllamaClient {
       };
       if (format) payload.format = format;
 
-      let response: Response;
-      try {
-        response = await fetch("/api/system/ollama/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
+      let response: Response | undefined;
 
-        if (!response.ok && response.status === 404) {
-          throw new Error("Server route 404, fallback to direct browser fetch");
+      // 1. Try local server proxy endpoint if not on static CDN
+      if (!this.isStaticDeployment()) {
+        try {
+          const res = await fetch("/api/system/ollama/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (res.ok) {
+            response = res;
+          }
+        } catch (_err) {
+          // Fall through to browser direct fetch
         }
-      } catch (_err) {
-        // Direct browser fetch to local Ollama instance for static deployments (GitHub Pages)
+      }
+
+      // 2. Direct browser fetch to local Ollama instance (port 11434)
+      if (!response || !response.ok) {
         response = await fetch(`${this.defaultHost}/api/chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
