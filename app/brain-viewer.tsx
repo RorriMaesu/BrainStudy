@@ -1,11 +1,10 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import {
   ContactShadows,
-  Html,
   OrbitControls,
   useGLTF,
   useProgress,
@@ -13,18 +12,24 @@ import {
 import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import { REGION_MAP, type ViewMode } from "./brain-data";
-import { CAMERA_PRESETS, SCENE_REGIONS, type CameraPreset } from "./scene-data";
+import {
+  CAMERA_PRESETS,
+  SCENE_REGIONS,
+  type CameraPreset,
+  type SceneRegion,
+} from "./scene-data";
 
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 const assetPath = (path: string) => `${BASE_PATH}${path}`;
 
 export type SectionPlane = "sagittal" | "coronal" | "axial";
 export type HemisphereMode = "both" | "left" | "right";
+export type LabelDensity = "off" | "focus" | "key" | "all";
 
 type ViewerProps = {
   mode: ViewMode;
   selectedId: string;
-  labels: boolean;
+  labelDensity: LabelDensity;
   colorized: boolean;
   separation: number;
   section: number;
@@ -32,6 +37,35 @@ type ViewerProps = {
   hemisphere: HemisphereMode;
   cameraPreset: CameraPreset;
   onSelect: (id: string) => void;
+};
+
+type AnchorSide = "left" | "right" | "midline";
+
+type RegionAnchor = {
+  key: string;
+  id: string;
+  side: AnchorSide;
+  position: THREE.Vector3;
+  normal: THREE.Vector3;
+  region: SceneRegion;
+};
+
+type ProjectedAnnotation = {
+  key: string;
+  id: string;
+  side?: "L" | "R";
+  x: number;
+  y: number;
+  label: string;
+  color: string;
+  selected: boolean;
+  priority: 1 | 2 | 3;
+};
+
+type AnnotationFrame = {
+  items: ProjectedAnnotation[];
+  width: number;
+  height: number;
 };
 
 type StructureProps = {
@@ -45,7 +79,63 @@ type StructureProps = {
   opacity?: number;
 };
 
-function CameraRig({ preset }: { preset: CameraPreset }) {
+function anchorsForRegion(
+  region: SceneRegion,
+  hemisphere: HemisphereMode,
+  separation: number,
+): RegionAnchor[] {
+  const allowedSides: AnchorSide[] =
+    region.laterality === "midline"
+      ? ["midline"]
+      : region.laterality === "left"
+        ? hemisphere === "right" ? [] : ["left"]
+        : hemisphere === "both" ? ["left", "right"] : [hemisphere];
+
+  return allowedSides.map((side) => {
+    const direction = side === "right" ? -1 : 1;
+    const x = side === "midline"
+      ? region.position[0]
+      : Math.abs(region.position[0]) * direction + direction * separation * 0.32;
+    const position = new THREE.Vector3(x, region.position[1], region.position[2]);
+    const normal = position.clone().normalize();
+    return {
+      key: `${region.id}-${side}`,
+      id: region.id,
+      side,
+      position,
+      normal,
+      region,
+    };
+  });
+}
+
+function closestCameraPreset(camera: THREE.Camera): CameraPreset {
+  const direction = camera.position.clone().normalize();
+  let closest: CameraPreset = "lateral";
+  let closestDot = -Infinity;
+
+  for (const [preset, config] of Object.entries(CAMERA_PRESETS) as [
+    CameraPreset,
+    (typeof CAMERA_PRESETS)[CameraPreset],
+  ][]) {
+    const presetDirection = new THREE.Vector3(...config.position).normalize();
+    const dot = direction.dot(presetDirection);
+    if (dot > closestDot) {
+      closest = preset;
+      closestDot = dot;
+    }
+  }
+
+  return closest;
+}
+
+function CameraRig({
+  preset,
+  onMovingChange,
+}: {
+  preset: CameraPreset;
+  onMovingChange: (moving: boolean) => void;
+}) {
   const { camera } = useThree();
   const controls = useRef<OrbitControlsImpl | null>(null);
   const goal = useRef(new THREE.Vector3(...CAMERA_PRESETS[preset].position));
@@ -55,7 +145,8 @@ function CameraRig({ preset }: { preset: CameraPreset }) {
     goal.current.set(...CAMERA_PRESETS[preset].position);
     camera.up.set(...CAMERA_PRESETS[preset].up);
     moving.current = true;
-  }, [camera, preset]);
+    onMovingChange(true);
+  }, [camera, onMovingChange, preset]);
 
   useFrame(() => {
     if (!moving.current) return;
@@ -63,7 +154,10 @@ function CameraRig({ preset }: { preset: CameraPreset }) {
     camera.lookAt(0, -0.02, 0);
     controls.current?.target.lerp(new THREE.Vector3(0, -0.02, 0), 0.12);
     controls.current?.update();
-    if (camera.position.distanceTo(goal.current) < 0.012) moving.current = false;
+    if (camera.position.distanceTo(goal.current) < 0.012) {
+      moving.current = false;
+      onMovingChange(false);
+    }
   });
 
   return (
@@ -77,7 +171,11 @@ function CameraRig({ preset }: { preset: CameraPreset }) {
       zoomSpeed={0.72}
       dampingFactor={0.065}
       enableDamping
-      onStart={() => { moving.current = false; }}
+      onStart={() => {
+        moving.current = false;
+        onMovingChange(true);
+      }}
+      onEnd={() => onMovingChange(false)}
     />
   );
 }
@@ -142,6 +240,7 @@ function Hemisphere({
       });
       child.castShadow = false;
       child.receiveShadow = true;
+      child.userData.labelOccluder = true;
       child.material = material;
       materials.push(material);
     });
@@ -472,30 +571,32 @@ function FunctionalPathways() {
 function RegionMarkers({
   mode,
   selectedId,
-  labels,
+  hemisphere,
+  separation,
   onSelect,
 }: {
   mode: ViewMode;
   selectedId: string;
-  labels: boolean;
+  hemisphere: HemisphereMode;
+  separation: number;
   onSelect: (id: string) => void;
 }) {
-  const markers = SCENE_REGIONS.filter((region) =>
-    mode === "surface" ? region.layers.includes("surface") && !["cerebellum", "medulla"].includes(region.id) : region.layers.includes(mode),
-  );
+  const markers = SCENE_REGIONS
+    .filter((region) => region.layers.includes(mode))
+    .flatMap((region) => anchorsForRegion(region, hemisphere, separation));
 
   return (
     <group>
-      {markers.map((region) => {
-        const data = REGION_MAP[region.id];
-        const selected = selectedId === region.id;
+      {markers.map((anchor) => {
+        const data = REGION_MAP[anchor.id];
+        const selected = selectedId === anchor.id;
         return (
-          <group key={region.id} position={region.position}>
+          <group key={anchor.key} position={anchor.position}>
             <mesh
               scale={selected ? 1.32 : 1}
               onClick={(event) => {
                 event.stopPropagation();
-                onSelect(region.id);
+                onSelect(anchor.id);
               }}
               onPointerEnter={() => { document.body.style.cursor = "pointer"; }}
               onPointerLeave={() => { document.body.style.cursor = "default"; }}
@@ -505,20 +606,8 @@ function RegionMarkers({
             </mesh>
             <mesh scale={selected ? 1.3 : 1}>
               <torusGeometry args={[0.034, 0.004, 8, 28]} />
-              <meshBasicMaterial color={data.color} transparent opacity={selected ? 0.92 : 0.44} toneMapped={false} />
+              <meshBasicMaterial color={data.color} transparent opacity={selected ? 0.92 : 0.4} toneMapped={false} />
             </mesh>
-            {labels && (
-              <Html
-                center
-                distanceFactor={2.4}
-                position={[0, 0, selected ? 0.075 : 0.055]}
-                style={{ pointerEvents: "none" }}
-              >
-                <span className={`anatomy-label ${selected ? "is-selected" : ""}`} style={{ "--label-color": data.color } as React.CSSProperties}>
-                  {data.shortName}
-                </span>
-              </Html>
-            )}
           </group>
         );
       })}
@@ -526,10 +615,233 @@ function RegionMarkers({
   );
 }
 
+function AnnotationProjector({
+  mode,
+  selectedId,
+  labelDensity,
+  hemisphere,
+  separation,
+  onUpdate,
+}: {
+  mode: ViewMode;
+  selectedId: string;
+  labelDensity: LabelDensity;
+  hemisphere: HemisphereMode;
+  separation: number;
+  onUpdate: (frame: AnnotationFrame) => void;
+}) {
+  const { camera, scene, size } = useThree();
+  const occluders = useRef<THREE.Mesh[]>([]);
+  const raycaster = useRef(new THREE.Raycaster());
+  const lastSignature = useRef("");
+  const lastUpdate = useRef(0);
+
+  useEffect(() => {
+    occluders.current = [];
+    lastSignature.current = "";
+  }, [hemisphere, mode]);
+
+  useFrame(({ clock }) => {
+    if (clock.elapsedTime - lastUpdate.current < 1 / 24) return;
+    lastUpdate.current = clock.elapsedTime;
+
+    if (labelDensity === "off") {
+      const signature = `off-${size.width}-${size.height}`;
+      if (signature !== lastSignature.current) {
+        lastSignature.current = signature;
+        onUpdate({ items: [], width: size.width, height: size.height });
+      }
+      return;
+    }
+
+    if (!occluders.current.length) {
+      scene.traverse((child) => {
+        if (child instanceof THREE.Mesh && child.userData.labelOccluder) {
+          occluders.current.push(child);
+        }
+      });
+    }
+
+    scene.updateMatrixWorld();
+    const activePreset = closestCameraPreset(camera);
+    const projected: ProjectedAnnotation[] = [];
+
+    for (const region of SCENE_REGIONS) {
+      if (!region.layers.includes(mode)) continue;
+      if (!region.labelViews.includes(activePreset) && region.id !== selectedId) continue;
+
+      const anchors = anchorsForRegion(region, hemisphere, separation)
+        .sort((a, b) => a.position.distanceToSquared(camera.position) - b.position.distanceToSquared(camera.position));
+      let visibleAnchor: RegionAnchor | undefined;
+
+      for (const anchor of anchors) {
+        const toCamera = camera.position.clone().sub(anchor.position).normalize();
+        if (mode === "surface" && anchor.normal.dot(toCamera) < 0.06) continue;
+
+        if (mode === "surface" && occluders.current.length) {
+          const direction = anchor.position.clone().sub(camera.position);
+          const anchorDistance = direction.length();
+          raycaster.current.set(camera.position, direction.normalize());
+          const blocked = raycaster.current
+            .intersectObjects(occluders.current, false)
+            .some((hit) => hit.distance < anchorDistance - 0.1);
+          if (blocked) continue;
+        }
+
+        visibleAnchor = anchor;
+        break;
+      }
+
+      if (!visibleAnchor) continue;
+      const screen = visibleAnchor.position.clone().project(camera);
+      if (screen.z < -1 || screen.z > 1 || Math.abs(screen.x) > 1.06 || Math.abs(screen.y) > 1.06) continue;
+
+      projected.push({
+        key: visibleAnchor.key,
+        id: region.id,
+        side: visibleAnchor.side === "midline"
+          ? undefined
+          : visibleAnchor.side === "left" ? "L" : "R",
+        x: (screen.x + 1) * size.width / 2,
+        y: (1 - screen.y) * size.height / 2,
+        label: REGION_MAP[region.id].shortName,
+        color: REGION_MAP[region.id].color,
+        selected: region.id === selectedId,
+        priority: region.priority,
+      });
+    }
+
+    const selected = projected.find((annotation) => annotation.selected);
+    const ranked = [...projected].sort((a, b) => {
+      if (a.selected !== b.selected) return a.selected ? -1 : 1;
+      if (a.priority !== b.priority) return a.priority - b.priority;
+      if (!selected) return a.y - b.y;
+      return Math.hypot(a.x - selected.x, a.y - selected.y)
+        - Math.hypot(b.x - selected.x, b.y - selected.y);
+    });
+
+    const visible = labelDensity === "focus"
+      ? ranked.slice(0, 3)
+      : labelDensity === "key"
+        ? ranked.filter((annotation) => annotation.selected || annotation.priority === 1).slice(0, 6)
+        : ranked.slice(0, 10);
+
+    const signature = `${activePreset}-${size.width}-${size.height}-${visible
+      .map((annotation) => `${annotation.key}:${Math.round(annotation.x / 2)}:${Math.round(annotation.y / 2)}`)
+      .join("|")}`;
+    if (signature !== lastSignature.current) {
+      lastSignature.current = signature;
+      onUpdate({ items: visible, width: size.width, height: size.height });
+    }
+  });
+
+  return null;
+}
+
+type LaidOutAnnotation = ProjectedAnnotation & {
+  lane: "left" | "right";
+  labelY: number;
+};
+
+function packLane(
+  annotations: ProjectedAnnotation[],
+  lane: "left" | "right",
+  height: number,
+): LaidOutAnnotation[] {
+  if (!annotations.length) return [];
+  const minY = lane === "right" ? 132 : 52;
+  const maxY = Math.max(minY, height - 84);
+  const gap = 48;
+  const sorted = [...annotations].sort((a, b) => a.y - b.y);
+  const positions = sorted.map((annotation, index) =>
+    Math.max(Math.min(annotation.y, maxY), index === 0 ? minY : minY + index * gap),
+  );
+
+  for (let index = 1; index < positions.length; index += 1) {
+    positions[index] = Math.max(positions[index], positions[index - 1] + gap);
+  }
+  if (positions.at(-1)! > maxY) {
+    positions[positions.length - 1] = maxY;
+    for (let index = positions.length - 2; index >= 0; index -= 1) {
+      positions[index] = Math.min(positions[index], positions[index + 1] - gap);
+    }
+  }
+
+  return sorted.map((annotation, index) => ({
+    ...annotation,
+    lane,
+    labelY: Math.max(minY, positions[index]),
+  }));
+}
+
+function layoutAnnotations(frame: AnnotationFrame): LaidOutAnnotation[] {
+  const sorted = [...frame.items].sort((a, b) => a.x - b.x);
+  if (sorted.length === 1) {
+    const lane = sorted[0].x < frame.width / 2 ? "left" : "right";
+    return packLane(sorted, lane, frame.height);
+  }
+  const split = Math.ceil(sorted.length / 2);
+  return [
+    ...packLane(sorted.slice(0, split), "left", frame.height),
+    ...packLane(sorted.slice(split), "right", frame.height),
+  ];
+}
+
+function AnnotationOverlay({
+  frame,
+  moving,
+  onSelect,
+}: {
+  frame: AnnotationFrame;
+  moving: boolean;
+  onSelect: (id: string) => void;
+}) {
+  const annotations = useMemo(() => layoutAnnotations(frame), [frame]);
+  if (!annotations.length) return null;
+
+  return (
+    <div className={`annotation-layer ${moving ? "is-moving" : ""}`} aria-label="Visible anatomical labels">
+      <svg viewBox={`0 0 ${frame.width} ${frame.height}`} preserveAspectRatio="none" aria-hidden="true">
+        {annotations.map((annotation) => {
+          const labelEdge = frame.width < 620 ? 124 : 158;
+          const endX = annotation.lane === "left" ? labelEdge : frame.width - labelEdge;
+          const elbowX = annotation.lane === "left"
+            ? Math.min(annotation.x - 24, endX + 24)
+            : Math.max(annotation.x + 24, endX - 24);
+          return (
+            <g key={annotation.key} style={{ "--annotation-color": annotation.color } as React.CSSProperties}>
+              <polyline points={`${annotation.x},${annotation.y} ${elbowX},${annotation.labelY} ${endX},${annotation.labelY}`} />
+              <circle cx={annotation.x} cy={annotation.y} r={annotation.selected ? 4.5 : 3} />
+            </g>
+          );
+        })}
+      </svg>
+      {annotations.map((annotation) => (
+        <button
+          key={annotation.key}
+          className={`annotation-card is-${annotation.lane} ${annotation.selected ? "is-selected" : ""}`}
+          style={{
+            top: annotation.labelY,
+            "--annotation-color": annotation.color,
+          } as React.CSSProperties}
+          onClick={() => onSelect(annotation.id)}
+          aria-label={`Select ${REGION_MAP[annotation.id].name}`}
+        >
+          <i />
+          <span>
+            <strong>{annotation.label}</strong>
+            {annotation.side && <small>{annotation.side}</small>}
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function Scene({
   mode,
   selectedId,
-  labels,
+  labelDensity,
   colorized,
   separation,
   section,
@@ -537,10 +849,15 @@ function Scene({
   hemisphere,
   cameraPreset,
   onSelect,
-}: ViewerProps) {
+  onAnnotations,
+  onCameraMoving,
+}: ViewerProps & {
+  onAnnotations: (frame: AnnotationFrame) => void;
+  onCameraMoving: (moving: boolean) => void;
+}) {
   return (
     <>
-      <CameraRig preset={cameraPreset} />
+      <CameraRig preset={cameraPreset} onMovingChange={onCameraMoving} />
       <hemisphereLight args={["#f1f4f7", "#26313b", 1.4]} />
       <ambientLight intensity={0.42} />
       <directionalLight position={[2.4, 2.8, 3.6]} intensity={2.65} color="#fff9f3" />
@@ -572,8 +889,22 @@ function Scene({
         )}
         <DeepAnatomy mode={mode} selectedId={selectedId} onSelect={onSelect} />
         {mode === "systems" && <FunctionalPathways />}
-        <RegionMarkers mode={mode} selectedId={selectedId} labels={labels} onSelect={onSelect} />
+        <RegionMarkers
+          mode={mode}
+          selectedId={selectedId}
+          hemisphere={hemisphere}
+          separation={separation}
+          onSelect={onSelect}
+        />
       </group>
+      <AnnotationProjector
+        mode={mode}
+        selectedId={selectedId}
+        labelDensity={labelDensity}
+        hemisphere={hemisphere}
+        separation={separation}
+        onUpdate={onAnnotations}
+      />
 
       <ContactShadows position={[0, 0, -0.72]} rotation={[0, 0, 0]} opacity={0.22} scale={2.6} blur={2.8} far={2.4} />
     </>
@@ -594,6 +925,18 @@ function LoadingOverlay() {
 
 export default function BrainViewer(props: ViewerProps) {
   const [webglAvailable, setWebglAvailable] = useState<boolean | null>(null);
+  const [annotationFrame, setAnnotationFrame] = useState<AnnotationFrame>({
+    items: [],
+    width: 1,
+    height: 1,
+  });
+  const [cameraMoving, setCameraMoving] = useState(false);
+  const handleAnnotations = useCallback((frame: AnnotationFrame) => {
+    setAnnotationFrame(frame);
+  }, []);
+  const handleCameraMoving = useCallback((moving: boolean) => {
+    setCameraMoving(moving);
+  }, []);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -644,9 +987,18 @@ export default function BrainViewer(props: ViewerProps) {
         }}
       >
         <Suspense fallback={null}>
-          <Scene {...props} />
+          <Scene
+            {...props}
+            onAnnotations={handleAnnotations}
+            onCameraMoving={handleCameraMoving}
+          />
         </Suspense>
       </Canvas>
+      <AnnotationOverlay
+        frame={annotationFrame}
+        moving={cameraMoving}
+        onSelect={props.onSelect}
+      />
       <div className="orientation-compass" aria-label={`Anatomical orientation. Current view: ${CAMERA_PRESETS[props.cameraPreset].label}`}>
         <span className="orientation-superior">S</span>
         <span className="orientation-anterior">A</span>

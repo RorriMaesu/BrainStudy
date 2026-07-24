@@ -1,35 +1,52 @@
 import type { ViewMode } from "./brain-data";
 
+export type CameraPreset =
+  | "lateral"
+  | "medial"
+  | "anterior"
+  | "posterior"
+  | "superior"
+  | "inferior";
+
+export type RegionLaterality = "bilateral" | "left" | "midline";
+
 export type SceneRegion = {
   id: string;
   position: [number, number, number];
-  labelPosition?: [number, number, number];
   layers: ViewMode[];
+  laterality: RegionLaterality;
+  priority: 1 | 2 | 3;
+  labelViews: CameraPreset[];
+  bestView: CameraPreset;
 };
 
 export const SCENE_REGIONS: SceneRegion[] = [
-  { id: "frontal", position: [0.70, 0.43, 0.12], layers: ["surface", "systems"] },
-  { id: "parietal", position: [0.67, -0.18, 0.34], layers: ["surface", "systems"] },
-  { id: "temporal", position: [0.70, 0.12, -0.25], layers: ["surface", "systems"] },
-  { id: "occipital", position: [0.55, -0.69, 0.04], layers: ["surface", "systems"] },
-  { id: "motor-cortex", position: [0.72, 0.08, 0.31], layers: ["surface", "systems"] },
-  { id: "somatosensory", position: [0.72, -0.05, 0.33], layers: ["surface", "systems"] },
-  { id: "broca", position: [0.69, 0.42, -0.08], layers: ["surface", "systems"] },
-  { id: "wernicke", position: [0.68, -0.34, -0.08], layers: ["surface", "systems"] },
-  { id: "corpus-callosum", position: [0, -0.03, 0.18], layers: ["deep", "systems"] },
-  { id: "thalamus", position: [0.12, -0.03, 0.01], layers: ["deep", "systems"] },
-  { id: "hypothalamus", position: [0, 0.08, -0.15], layers: ["deep", "systems"] },
-  { id: "pituitary", position: [0, 0.14, -0.34], layers: ["deep", "systems"] },
-  { id: "pineal", position: [0, -0.23, 0.06], layers: ["deep", "systems"] },
-  { id: "hippocampus", position: [0.22, -0.05, -0.23], layers: ["deep", "systems"] },
-  { id: "amygdala", position: [0.25, 0.30, -0.23], layers: ["deep", "systems"] },
-  { id: "basal-ganglia", position: [0.22, 0.11, 0.05], layers: ["deep", "systems"] },
-  { id: "cerebellum", position: [0.25, -0.58, -0.38], layers: ["surface", "deep", "systems"] },
-  { id: "midbrain", position: [0, -0.08, -0.25], layers: ["deep", "systems"] },
-  { id: "pons", position: [0, -0.10, -0.39], layers: ["deep", "systems"] },
-  { id: "medulla", position: [0, -0.10, -0.55], layers: ["surface", "deep", "systems"] },
-  { id: "ventricles", position: [0.11, -0.02, 0.15], layers: ["deep", "systems"] },
+  { id: "frontal", position: [0.70, 0.43, 0.12], layers: ["surface", "systems"], laterality: "bilateral", priority: 1, labelViews: ["lateral", "anterior", "superior"], bestView: "lateral" },
+  { id: "parietal", position: [0.67, -0.18, 0.34], layers: ["surface", "systems"], laterality: "bilateral", priority: 1, labelViews: ["lateral", "posterior", "superior"], bestView: "lateral" },
+  { id: "temporal", position: [0.70, 0.12, -0.25], layers: ["surface", "systems"], laterality: "bilateral", priority: 1, labelViews: ["lateral", "inferior"], bestView: "lateral" },
+  { id: "occipital", position: [0.55, -0.69, 0.04], layers: ["surface", "systems"], laterality: "bilateral", priority: 1, labelViews: ["lateral", "posterior", "superior"], bestView: "posterior" },
+  { id: "motor-cortex", position: [0.72, 0.08, 0.31], layers: ["surface", "systems"], laterality: "bilateral", priority: 1, labelViews: ["lateral", "superior"], bestView: "superior" },
+  { id: "somatosensory", position: [0.72, -0.05, 0.33], layers: ["surface", "systems"], laterality: "bilateral", priority: 1, labelViews: ["lateral", "superior"], bestView: "superior" },
+  { id: "broca", position: [0.69, 0.42, -0.08], layers: ["surface", "systems"], laterality: "left", priority: 2, labelViews: ["lateral"], bestView: "lateral" },
+  { id: "wernicke", position: [0.68, -0.34, -0.08], layers: ["surface", "systems"], laterality: "left", priority: 2, labelViews: ["lateral"], bestView: "lateral" },
+  { id: "corpus-callosum", position: [0, -0.03, 0.18], layers: ["deep", "systems"], laterality: "midline", priority: 1, labelViews: ["medial", "superior"], bestView: "medial" },
+  { id: "thalamus", position: [0.12, -0.03, 0.01], layers: ["deep", "systems"], laterality: "bilateral", priority: 1, labelViews: ["medial", "superior"], bestView: "medial" },
+  { id: "hypothalamus", position: [0, 0.08, -0.15], layers: ["deep", "systems"], laterality: "midline", priority: 2, labelViews: ["medial", "inferior"], bestView: "medial" },
+  { id: "pituitary", position: [0, 0.14, -0.34], layers: ["deep", "systems"], laterality: "midline", priority: 3, labelViews: ["medial", "inferior"], bestView: "inferior" },
+  { id: "pineal", position: [0, -0.23, 0.06], layers: ["deep", "systems"], laterality: "midline", priority: 3, labelViews: ["medial", "posterior"], bestView: "medial" },
+  { id: "hippocampus", position: [0.22, -0.05, -0.23], layers: ["deep", "systems"], laterality: "bilateral", priority: 1, labelViews: ["medial", "inferior"], bestView: "medial" },
+  { id: "amygdala", position: [0.25, 0.30, -0.23], layers: ["deep", "systems"], laterality: "bilateral", priority: 2, labelViews: ["medial", "anterior", "inferior"], bestView: "medial" },
+  { id: "basal-ganglia", position: [0.22, 0.11, 0.05], layers: ["deep", "systems"], laterality: "bilateral", priority: 1, labelViews: ["medial", "anterior", "superior"], bestView: "medial" },
+  { id: "cerebellum", position: [0.25, -0.58, -0.38], layers: ["surface", "deep", "systems"], laterality: "bilateral", priority: 1, labelViews: ["posterior", "inferior"], bestView: "posterior" },
+  { id: "midbrain", position: [0, -0.08, -0.25], layers: ["deep", "systems"], laterality: "midline", priority: 2, labelViews: ["medial", "posterior", "inferior"], bestView: "medial" },
+  { id: "pons", position: [0, -0.10, -0.39], layers: ["deep", "systems"], laterality: "midline", priority: 2, labelViews: ["medial", "posterior", "inferior"], bestView: "medial" },
+  { id: "medulla", position: [0, -0.10, -0.55], layers: ["surface", "deep", "systems"], laterality: "midline", priority: 1, labelViews: ["posterior", "inferior"], bestView: "inferior" },
+  { id: "ventricles", position: [0.11, -0.02, 0.15], layers: ["deep", "systems"], laterality: "bilateral", priority: 2, labelViews: ["medial", "superior"], bestView: "medial" },
 ];
+
+export const SCENE_REGION_MAP: Record<string, SceneRegion> = Object.fromEntries(
+  SCENE_REGIONS.map((region) => [region.id, region]),
+);
 
 export type AcademicDetail = {
   connections: string[];
@@ -145,7 +162,11 @@ export const ACADEMIC_DETAILS: Record<string, AcademicDetail> = {
   },
 };
 
-export const CAMERA_PRESETS = {
+export const CAMERA_PRESETS: Record<CameraPreset, {
+  label: string;
+  position: [number, number, number];
+  up: [number, number, number];
+}> = {
   lateral: {
     label: "Lateral",
     position: [2.7, 0.05, 0.18] as [number, number, number],
@@ -177,5 +198,3 @@ export const CAMERA_PRESETS = {
     up: [0, -1, 0] as [number, number, number],
   },
 };
-
-export type CameraPreset = keyof typeof CAMERA_PRESETS;

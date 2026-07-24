@@ -556,25 +556,120 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   box-shadow: 0 0 12px rgba(125,216,232,.7);
   transition: width 120ms linear;
 }
-.anatomy-label {
-  display: block;
-  min-width: max-content;
-  padding: 6px 9px;
-  border: 1px solid color-mix(in srgb, var(--label-color), transparent 54%);
-  background: rgba(7, 10, 15, .86);
-  color: #dfe7eb;
-  box-shadow: 0 4px 14px rgba(0,0,0,.32);
+.annotation-layer {
+  position: absolute;
+  z-index: 6;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.annotation-layer svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  transition: opacity 160ms ease;
+}
+.annotation-layer svg g { color: var(--annotation-color); }
+.annotation-layer polyline {
+  fill: none;
+  stroke: color-mix(in srgb, currentColor, transparent 26%);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.annotation-layer circle {
+  fill: currentColor;
+  stroke: #091017;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 4px currentColor);
+}
+.annotation-card {
+  position: absolute;
+  width: 136px;
+  min-height: 38px;
+  display: flex;
+  align-items: stretch;
+  gap: 9px;
+  border: 1px solid color-mix(in srgb, var(--annotation-color), transparent 54%);
+  background: rgba(7, 11, 16, .88);
+  color: #dfe6ea;
+  padding: 0;
+  box-shadow: 0 8px 24px rgba(0,0,0,.34);
+  cursor: pointer;
+  pointer-events: auto;
+  transform: translateY(-50%);
+  backdrop-filter: blur(12px);
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease,
+    border-color 140ms ease,
+    background 140ms ease;
+}
+.annotation-card:hover,
+.annotation-card:focus-visible {
+  border-color: var(--annotation-color);
+  background: rgba(13, 19, 26, .96);
+  outline: none;
+}
+.annotation-card.is-left {
+  left: 16px;
+  text-align: left;
+}
+.annotation-card.is-right {
+  right: 16px;
+  flex-direction: row-reverse;
+  text-align: right;
+}
+.annotation-card > i {
+  width: 3px;
+  flex: 0 0 3px;
+  background: var(--annotation-color);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--annotation-color), transparent 34%);
+}
+.annotation-card > span {
+  min-width: 0;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 8px 7px 0;
+}
+.annotation-card.is-right > span {
+  justify-content: flex-end;
+  padding: 7px 0 7px 8px;
+}
+.annotation-card strong {
+  overflow: hidden;
+  color: #dce4e8;
   font-family: var(--font-geist-mono), monospace;
   font-size: 10px;
-  font-weight: 600;
-  letter-spacing: .02em;
+  font-weight: 650;
+  letter-spacing: .015em;
+  text-overflow: ellipsis;
   white-space: nowrap;
-  transform: translateY(-100%);
 }
-.anatomy-label.is-selected {
-  border-color: var(--label-color);
-  color: white;
-  box-shadow: 0 0 18px color-mix(in srgb, var(--label-color), transparent 66%);
+.annotation-card small {
+  border: 1px solid color-mix(in srgb, var(--annotation-color), transparent 62%);
+  color: var(--annotation-color);
+  padding: 1px 3px;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 10px;
+  line-height: 1;
+}
+.annotation-card.is-selected {
+  border-color: var(--annotation-color);
+  background: color-mix(in srgb, var(--annotation-color) 9%, rgba(7, 11, 16, .94));
+  box-shadow:
+    0 8px 26px rgba(0,0,0,.4),
+    0 0 18px color-mix(in srgb, var(--annotation-color), transparent 76%);
+}
+.annotation-layer.is-moving svg { opacity: .18; }
+.annotation-layer.is-moving .annotation-card {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%) scale(.97);
 }
 .camera-dock {
   position: absolute;
@@ -941,7 +1036,7 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 }
 .toggle-row {
   display: grid;
-  grid-template-columns: 1fr 1.35fr;
+  grid-template-columns: 1.1fr 1.35fr;
   gap: 6px;
   margin-top: 15px;
 }
@@ -963,6 +1058,20 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   background: rgba(125,216,232,.055);
   color: var(--cyan-strong);
 }
+.label-shortcut {
+  min-width: 0;
+  height: 35px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  color: #84919c;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 10px;
+  white-space: nowrap;
+}
+.label-shortcut .ui-icon { width: 13px; }
 kbd {
   border: 1px solid rgba(255,255,255,.14);
   background: #161d26;
@@ -973,13 +1082,18 @@ kbd {
 }
 .segmented-control { margin-top: 12px; }
 .segmented-control > span {
-  display: block;
+  display: flex;
+  justify-content: space-between;
   margin-bottom: 7px;
   color: #929faa;
   font-family: var(--font-geist-mono), monospace;
   font-size: 10px;
   letter-spacing: .04em;
   text-transform: uppercase;
+}
+.segmented-control > span b {
+  color: #b2bec6;
+  font-weight: 500;
 }
 .segmented-control > div {
   display: grid;
@@ -1001,6 +1115,7 @@ kbd {
   background: rgba(114, 199, 210, .08);
   color: var(--cyan-strong);
 }
+.label-density-control > div { grid-template-columns: repeat(4, 1fr); }
 
 .app-footer {
   display: flex;
@@ -1189,6 +1304,11 @@ kbd {
   .camera-dock { width: calc(100% - 20px); overflow-x: auto; }
   .camera-dock > span { display: none; }
   .camera-dock button { flex: 1; min-width: 54px; padding: 0 5px; }
+  .annotation-card { width: 108px; }
+  .annotation-card.is-left { left: 10px; }
+  .annotation-card.is-right { right: 10px; }
+  .annotation-card > span { gap: 4px; padding-right: 5px; }
+  .annotation-card.is-right > span { padding-right: 0; padding-left: 5px; }
   .pathway-legend { display: none; }
   .region-list { grid-template-columns: 1fr; }
   .methods-modal { padding: 30px 18px 22px; }

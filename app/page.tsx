@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import BrainViewer, { type HemisphereMode, type SectionPlane } from "./brain-viewer";
+import BrainViewer, {
+  type HemisphereMode,
+  type LabelDensity,
+  type SectionPlane,
+} from "./brain-viewer";
 import {
   REGIONS,
   REGION_MAP,
@@ -10,7 +14,12 @@ import {
   VIEW_INFO,
   type ViewMode,
 } from "./brain-data";
-import { ACADEMIC_DETAILS, CAMERA_PRESETS, type CameraPreset } from "./scene-data";
+import {
+  ACADEMIC_DETAILS,
+  CAMERA_PRESETS,
+  SCENE_REGION_MAP,
+  type CameraPreset,
+} from "./scene-data";
 import {
   SCIENCE_SOURCES,
   VIEW_AUTHORITY,
@@ -19,6 +28,7 @@ import {
 } from "./science-authority";
 
 type DetailTab = "overview" | "connections" | "clinical" | "evidence";
+const LABEL_DENSITIES: LabelDensity[] = ["off", "focus", "key", "all"];
 
 const LAYER_COPY: Record<ViewMode, { index: string; title: string; subtitle: string }> = {
   surface: { index: "01", title: "Cortical surface", subtitle: "Gyri, sulci & lobes" },
@@ -54,7 +64,7 @@ export default function Home() {
   const [selectedId, setSelectedId] = useState("frontal");
   const [detailTab, setDetailTab] = useState<DetailTab>("overview");
   const [search, setSearch] = useState("");
-  const [labels, setLabels] = useState(true);
+  const [labelDensity, setLabelDensity] = useState<LabelDensity>("key");
   const [colorized, setColorized] = useState(true);
   const [separation, setSeparation] = useState(0);
   const [section, setSection] = useState(0);
@@ -125,6 +135,15 @@ export default function Home() {
     }
     setSelectedId(id);
     setDetailTab("overview");
+    const sceneRegion = SCENE_REGION_MAP[id];
+    if (sceneRegion) {
+      if (!sceneRegion.labelViews.includes(cameraPreset)) {
+        setCameraPreset(sceneRegion.bestView);
+      }
+      if (sceneRegion.laterality === "left" && hemisphere === "right") {
+        setHemisphere("left");
+      }
+    }
   };
 
   const toggleQuiz = () => {
@@ -133,15 +152,19 @@ export default function Home() {
     setQuizMessage("");
     if (next) {
       chooseQuizTarget();
-      setLabels(false);
-    } else {
-      setLabels(true);
     }
   };
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key.toLowerCase() === "l") setLabels((current) => !current);
+      const target = event.target as HTMLElement | null;
+      const isTyping = target?.matches("input, textarea, [contenteditable='true']");
+      if (event.key.toLowerCase() === "l" && !isTyping) {
+        setLabelDensity((current) => {
+          const currentIndex = LABEL_DENSITIES.indexOf(current);
+          return LABEL_DENSITIES[(currentIndex + 1) % LABEL_DENSITIES.length];
+        });
+      }
       if (event.key.toLowerCase() === "r") {
         setSection(0);
         setSeparation(0);
@@ -266,7 +289,7 @@ export default function Home() {
           <BrainViewer
             mode={mode}
             selectedId={selectedId}
-            labels={labels && !quizMode}
+            labelDensity={quizMode ? "off" : labelDensity}
             colorized={colorized}
             separation={separation}
             section={section}
@@ -450,6 +473,7 @@ export default function Home() {
                   setSectionPlane("sagittal");
                   setHemisphere("both");
                   setCameraPreset("lateral");
+                  setLabelDensity("key");
                 }}
               >
                 <Icon name="reset" /> Reset
@@ -507,13 +531,31 @@ export default function Home() {
                 onChange={(event) => setSection(Number(event.target.value))}
               />
             </label>
+            <div className="segmented-control label-density-control">
+              <span>
+                Annotation density
+                <b>{labelDensity === "off" ? "Hidden" : labelDensity}</b>
+              </span>
+              <div role="group" aria-label="Annotation density">
+                {LABEL_DENSITIES.map((density) => (
+                  <button
+                    key={density}
+                    className={labelDensity === density ? "active" : ""}
+                    aria-pressed={labelDensity === density}
+                    onClick={() => setLabelDensity(density)}
+                  >
+                    {density}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="toggle-row">
-              <button className={labels ? "active" : ""} onClick={() => setLabels((current) => !current)}>
-                <Icon name="label" /> Labels <kbd>L</kbd>
-              </button>
               <button className={colorized ? "active" : ""} onClick={() => setColorized((current) => !current)}>
                 <Icon name="palette" /> Teaching colors
               </button>
+              <span className="label-shortcut">
+                <Icon name="label" /> Press <kbd>L</kbd> to cycle labels
+              </span>
             </div>
           </div>
         </aside>

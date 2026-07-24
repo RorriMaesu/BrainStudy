@@ -39,6 +39,30 @@ test("the viewer exposes orientation and three anatomical section planes", async
   assert.doesNotMatch(viewer, /\bSparkles\b|\bEnvironment\b/);
 });
 
+test("the annotation system is camera-aware, bilateral and collision-managed", async () => {
+  const [page, viewer, scene, css] = await Promise.all([
+    source("app/page.tsx"),
+    source("app/brain-viewer.tsx"),
+    source("app/scene-data.ts"),
+    source("app/globals.css"),
+  ]);
+
+  assert.match(scene, /laterality:\s*"bilateral"/);
+  assert.match(scene, /laterality:\s*"left"/);
+  assert.match(scene, /laterality:\s*"midline"/);
+  assert.match(scene, /labelViews:/);
+  assert.match(scene, /bestView:/);
+  assert.match(viewer, /function AnnotationProjector/);
+  assert.match(viewer, /intersectObjects\(occluders\.current/);
+  assert.match(viewer, /function packLane/);
+  assert.match(viewer, /function AnnotationOverlay/);
+  assert.doesNotMatch(viewer, /<Html\b/);
+  assert.match(page, /LABEL_DENSITIES[\s\S]*"off"[\s\S]*"focus"[\s\S]*"key"[\s\S]*"all"/);
+  assert.match(css, /\.annotation-card\.is-left/);
+  assert.match(css, /\.annotation-card\.is-right/);
+  assert.match(css, /\.annotation-layer\.is-moving/);
+});
+
 test("primary interface text does not regress to unreadable microtype", async () => {
   const css = await source("app/globals.css");
   assert.doesNotMatch(css, /font-size:\s*(?:[0-9](?:\.\d+)?)px/);
