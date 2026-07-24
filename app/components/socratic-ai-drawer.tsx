@@ -131,7 +131,7 @@ export function SocraticAIDrawer({
           );
         }
       );
-    } catch (err: any) {
+    } catch (_err) {
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === assistantMsgId
@@ -211,7 +211,7 @@ Grade the student's answer using the requested JSON format. Evaluate anatomical 
 
       const parsed: AIGradingResult = JSON.parse(jsonText);
       setGradingResult(parsed);
-    } catch (err) {
+    } catch (_err) {
       // Fallback evaluation if JSON parsing fails
       setGradingResult({
         score: 85,

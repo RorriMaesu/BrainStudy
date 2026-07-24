@@ -1,3 +1,5 @@
+export const dynamic = "force-static";
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -24,9 +26,10 @@ export async function POST(req: Request) {
         Connection: "keep-alive",
       },
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
     console.error("Ollama proxy chat endpoint error:", err);
-    return new Response(`Failed to communicate with local Ollama service: ${err.message}`, {
+    return new Response(`Failed to communicate with local Ollama service: ${message}`, {
       status: 503,
     });
   }

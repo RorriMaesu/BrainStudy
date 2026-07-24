@@ -1,6 +1,8 @@
 import { exec } from "child_process";
 import { promisify } from "util";
 
+export const dynamic = "force-static";
+
 const execAsync = promisify(exec);
 
 export async function GET() {
@@ -11,7 +13,7 @@ export async function GET() {
   // 1. Try nvidia-smi on Windows/Linux
   try {
     const { stdout } = await execAsync(
-      'nvidia-smi --query-gpu=memory.total,name --format=csv,noheader,nounits',
+      "nvidia-smi --query-gpu=memory.total,name --format=csv,noheader,nounits",
       { timeout: 2500 }
     );
     if (stdout && stdout.trim()) {
@@ -25,7 +27,7 @@ export async function GET() {
         }
       }
     }
-  } catch {
+  } catch (_err) {
     // nvidia-smi not available or non-NVIDIA GPU
   }
 
@@ -46,7 +48,7 @@ export async function GET() {
           }
         }
       }
-    } catch {
+    } catch (_err) {
       // Ignore PowerShell errors
     }
   }

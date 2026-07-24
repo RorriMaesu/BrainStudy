@@ -1,6 +1,8 @@
+export const dynamic = "force-static";
+
 export async function POST(req: Request) {
   try {
-    const { model } = await req.json();
+    const { model } = (await req.json()) as { model?: string };
     const defaultHost = "http://127.0.0.1:11434";
 
     const ollamaResponse = await fetch(`${defaultHost}/api/pull`, {
@@ -22,8 +24,9 @@ export async function POST(req: Request) {
         "Cache-Control": "no-cache",
       },
     });
-  } catch (err: any) {
-    return new Response(`Failed to communicate with local Ollama service: ${err.message}`, {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return new Response(`Failed to communicate with local Ollama service: ${message}`, {
       status: 503,
     });
   }

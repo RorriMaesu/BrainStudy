@@ -1,5 +1,7 @@
 import { spawn } from "child_process";
 
+export const dynamic = "force-static";
+
 export async function POST() {
   try {
     if (process.platform === "win32") {
@@ -29,12 +31,13 @@ export async function POST() {
       success: true,
       message: "Ollama launch signal sent successfully.",
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to launch Ollama process on host system.";
     console.error("Failed to launch Ollama process:", err);
     return Response.json(
       {
         success: false,
-        message: err.message || "Failed to launch Ollama process on host system.",
+        message,
       },
       { status: 500 }
     );

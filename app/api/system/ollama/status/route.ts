@@ -1,6 +1,8 @@
 import { exec } from "child_process";
 import { promisify } from "util";
 
+export const dynamic = "force-static";
+
 const execAsync = promisify(exec);
 
 export async function GET() {
@@ -14,15 +16,17 @@ export async function GET() {
     });
 
     if (res.ok) {
-      const data = await res.json();
-      let runningModels = [];
+      const data = (await res.json()) as { models?: Array<unknown> };
+      let runningModels: Array<unknown> = [];
       try {
         const psRes = await fetch(`${defaultHost}/api/ps`, { signal: AbortSignal.timeout(1000) });
         if (psRes.ok) {
-          const psData = await psRes.json();
+          const psData = (await psRes.json()) as { models?: Array<unknown> };
           runningModels = psData.models || [];
         }
-      } catch {}
+      } catch (_err) {
+        // Ignore /api/ps error if unsupported
+      }
 
       return Response.json({
         status: "RUNNING",
@@ -31,7 +35,7 @@ export async function GET() {
         version: "0.5.x",
       });
     }
-  } catch {
+  } catch (_err) {
     // Port 11434 not responding
   }
 
@@ -43,7 +47,7 @@ export async function GET() {
     if (stdout && stdout.trim()) {
       isInstalled = true;
     }
-  } catch {
+  } catch (_err) {
     isInstalled = false;
   }
 

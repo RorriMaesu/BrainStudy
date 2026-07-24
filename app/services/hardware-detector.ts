@@ -124,7 +124,7 @@ export function getRecommendedModelForVRAM(vramGB: number): { primary: string; a
 export async function detectGPUHardware(): Promise<GPUHardwareInfo> {
   let renderer = "Standard GPU";
   let vendor = "Generic Vendor";
-  let estimatedVRAMGB = 8; // default fallback
+  let estimatedVRAMGB = 8;
   let method: GPUHardwareInfo["detectionMethod"] = "fallback";
 
   if (typeof window === "undefined") {
@@ -143,10 +143,11 @@ export async function detectGPUHardware(): Promise<GPUHardwareInfo> {
 
   // 1. Try WebGPU requestAdapter
   try {
-    if ("gpu" in navigator && (navigator as any).gpu) {
-      const adapter = await (navigator as any).gpu.requestAdapter();
+    if ("gpu" in navigator && (navigator as unknown as { gpu?: { requestAdapter: () => Promise<unknown> } }).gpu) {
+      const gpuNav = (navigator as unknown as { gpu: { requestAdapter: () => Promise<unknown> } }).gpu;
+      const adapter = (await gpuNav.requestAdapter()) as { info?: { description?: string; architecture?: string; vendor?: string } } | null;
       if (adapter) {
-        const info = (adapter as any).info || {};
+        const info = adapter.info || {};
         if (info.description || info.architecture || info.vendor) {
           renderer = info.description || info.architecture || renderer;
           vendor = info.vendor || vendor;
@@ -154,7 +155,7 @@ export async function detectGPUHardware(): Promise<GPUHardwareInfo> {
         }
       }
     }
-  } catch {
+  } catch (_err) {
     // Ignore WebGPU errors and fall back to WebGL
   }
 
@@ -164,14 +165,18 @@ export async function detectGPUHardware(): Promise<GPUHardwareInfo> {
       const canvas = document.createElement("canvas");
       const gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
       if (gl) {
-        const debugInfo = (gl as any).getExtension("WEBGL_debug_renderer_info");
+        const glCtx = gl as unknown as {
+          getExtension: (name: string) => { UNMASKED_RENDERER_WEBGL: number; UNMASKED_VENDOR_WEBGL: number } | null;
+          getParameter: (p: number) => string;
+        };
+        const debugInfo = glCtx.getExtension("WEBGL_debug_renderer_info");
         if (debugInfo) {
-          renderer = (gl as any).getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) || renderer;
-          vendor = (gl as any).getParameter(debugInfo.UNMASKED_VENDOR_WEBGL) || vendor;
+          renderer = glCtx.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) || renderer;
+          vendor = glCtx.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL) || vendor;
           method = "webgl";
         }
       }
-    } catch {
+    } catch (_err) {
       // Ignore WebGL debug extension errors
     }
   }
@@ -217,14 +222,14 @@ export async function detectGPUHardware(): Promise<GPUHardwareInfo> {
   try {
     const res = await fetch("/api/system/gpu", { cache: "no-store" });
     if (res.ok) {
-      const data: any = await res.json();
-      if (data && data.vramGB && data.vramGB > 0) {
+      const data = (await res.json()) as { vramGB?: number; gpuName?: string };
+      if (data && typeof data.vramGB === "number" && data.vramGB > 0) {
         estimatedVRAMGB = data.vramGB;
         if (data.gpuName) renderer = data.gpuName;
         method = "server";
       }
     }
-  } catch {
+  } catch (_err) {
     // Local server hardware endpoint offline or in static preview mode
   }
 

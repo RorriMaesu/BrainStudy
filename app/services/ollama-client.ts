@@ -47,18 +47,18 @@ export class OllamaClient {
       });
 
       if (res.ok) {
-        const data: any = await res.json();
-        const models: OllamaModelTag[] = data?.models || [];
+        const data = (await res.json()) as { models?: OllamaModelTag[] };
+        const models: OllamaModelTag[] = data.models || [];
 
         // Check running models via /api/ps
         let runningModels: OllamaProcessInfo[] = [];
         try {
           const psRes = await fetch(`${this.defaultHost}/api/ps`, { signal: AbortSignal.timeout(1500) });
           if (psRes.ok) {
-            const psData: any = await psRes.json();
-            runningModels = psData?.models || [];
+            const psData = (await psRes.json()) as { models?: OllamaProcessInfo[] };
+            runningModels = psData.models || [];
           }
-        } catch {
+        } catch (_err) {
           // Ignore /api/ps error if unsupported
         }
 
@@ -70,7 +70,7 @@ export class OllamaClient {
           activeModel: runningModels[0]?.name || models[0]?.name || "gemma4:12b",
         };
       }
-    } catch {
+    } catch (_err) {
       // Direct ping failed, query server status proxy route
     }
 
@@ -79,7 +79,7 @@ export class OllamaClient {
       if (serverRes.ok) {
         return (await serverRes.json()) as OllamaStatusResponse;
       }
-    } catch {
+    } catch (_err) {
       // Server route unreachable
     }
 
@@ -100,10 +100,11 @@ export class OllamaClient {
         headers: { "Content-Type": "application/json" },
       });
       if (res.ok) {
-        return await res.json();
+        return (await res.json()) as { success: boolean; message: string };
       }
-    } catch (err: any) {
-      return { success: false, message: err.message || "Failed to reach server launcher endpoint." };
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to reach server launcher endpoint.";
+      return { success: false, message };
     }
     return { success: false, message: "Server launcher returned an error." };
   }
@@ -123,7 +124,7 @@ export class OllamaClient {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ model: modelName }),
         });
-      } catch {
+      } catch (_err) {
         // Direct browser fallback for static hostings (GitHub Pages)
         res = await fetch(`${this.defaultHost}/api/pull`, {
           method: "POST",
@@ -146,21 +147,21 @@ export class OllamaClient {
 
         for (const line of lines) {
           try {
-            const json = JSON.parse(line);
+            const json = JSON.parse(line) as { status?: string; total?: number; completed?: number };
             if (json.status) {
               let pct: number | undefined;
-              if (json.total && json.completed) {
+              if (typeof json.total === "number" && typeof json.completed === "number" && json.total > 0) {
                 pct = Math.round((json.completed / json.total) * 100);
               }
               onProgress(json.status, pct);
             }
-          } catch {
+          } catch (_err) {
             // Partial JSON chunk
           }
         }
       }
       return true;
-    } catch (err) {
+    } catch (err: unknown) {
       console.error("Error pulling model:", err);
       return false;
     }
@@ -172,13 +173,13 @@ export class OllamaClient {
   static async streamChat(
     model: string,
     messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
-    format?: any,
+    format?: unknown,
     onChunk?: (chunk: string) => void,
   ): Promise<string> {
     let fullResponse = "";
 
     try {
-      const payload: any = {
+      const payload: Record<string, unknown> = {
         model,
         messages,
         stream: true,
@@ -196,7 +197,7 @@ export class OllamaClient {
         if (!response.ok && response.status === 404) {
           throw new Error("Server route 404, fallback to direct browser fetch");
         }
-      } catch {
+      } catch (_err) {
         // Direct browser fetch to local Ollama instance for static deployments (GitHub Pages)
         response = await fetch(`${this.defaultHost}/api/chat`, {
           method: "POST",
@@ -210,7 +211,7 @@ export class OllamaClient {
       }
 
       if (!response.body) {
-        const data: any = await response.json();
+        const data = (await response.json()) as { message?: { content?: string } };
         return data?.message?.content || "";
       }
 
@@ -226,18 +227,18 @@ export class OllamaClient {
 
         for (const line of lines) {
           try {
-            const json = JSON.parse(line);
+            const json = JSON.parse(line) as { message?: { content?: string }; response?: string };
             const content = json.message?.content || json.response || "";
             fullResponse += content;
             if (onChunk && content) {
               onChunk(content);
             }
-          } catch {
+          } catch (_err) {
             // Buffer chunk
           }
         }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Ollama Chat Stream Error:", err);
       throw err;
     }
