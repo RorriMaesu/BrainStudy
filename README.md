@@ -4,15 +4,26 @@
 
 ### Advanced 3D Neuroanatomy Laboratory & Local Socratic AI Studio
 
-[![Launch Live WebApp](https://img.shields.io/badge/🚀_LAUNCH_LIVE_WEBAPP-BrainStudy-00f2fe?style=for-the-badge&logo=rocket&logoColor=white)](https://rorrimaesu.github.io/BrainStudy/)
-[![Buy Me A Coffee](https://img.shields.io/badge/☕_BUY_ME_A_COFFEE-Support_BrainStudy-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/rorrimaesu)
-
 <br />
 
+<a href="https://rorrimaesu.github.io/BrainStudy/" target="_blank">
+  <img src="https://img.shields.io/badge/%F0%9F%9A%80%20Launch%20Live%20WebApp-00f2fe?style=for-the-badge&logo=rocket&logoColor=white" alt="Launch Live WebApp" />
+</a>
+&nbsp;&nbsp;
+<a href="https://buymeacoffee.com/rorrimaesu" target="_blank">
+  <img src="https://img.shields.io/badge/%E2%98%95%20Buy%20Me%20A%20Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black" alt="Buy Me A Coffee" />
+</a>
+
+<br /><br />
+
 [![Gemma 4 Ready](https://img.shields.io/badge/Gemma_4-12B_%7C_e4b_%7C_e2b-4285F4?style=flat-square&logo=google&logoColor=white)](https://ollama.com)
-[![Ollama Powered](https://img.shields.io/badge/Ollama-Local_AI_Bridge-000000?style=flat-square&logo=ollama&logoColor=white)](https://ollama.com)
+&nbsp;
+[![Ollama Powered](https://img.shields.io/badge/Ollama-Local_AI-000000?style=flat-square&logo=ollama&logoColor=white)](https://ollama.com)
+&nbsp;
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22.13.0-339933?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org)
+&nbsp;
 [![Next.js 16](https://img.shields.io/badge/Next.js-16.2-black?style=flat-square&logo=next.js&logoColor=white)](https://nextjs.org)
+&nbsp;
 [![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC_BY--NC--SA_4.0-lightgrey?style=flat-square)](public/models/BIGBRAIN-LICENSE.txt)
 
 ---
@@ -25,40 +36,55 @@
 
 ---
 
-## 📐 System Architecture & Hardware Flow
+> [!NOTE]
+> **100% Local AI Privacy**: BrainStudy communicates with your local Ollama server (`http://127.0.0.1:11434`). No prompts, user data, or telemetry ever leave your device.
+
+---
+
+## 🏛️ System Architecture & Execution Flow
+
+```mermaid
+graph TD
+    UI["🧠 BrainStudy UI (3D Canvas / Socratic Studio / AI Quiz)"]
+    GPU["🖥️ Hardware Diagnostic Engine (WebGL & nvidia-smi VRAM)"]
+    BRIDGE["⚡ Local Server Process Launcher (/api/system/ollama/launch)"]
+    OLLAMA["🤖 Ollama Local Service (Gemma 4 12B / Llama 3.1)"]
+
+    UI -->|"1. Detect VRAM & GPU Model"| GPU
+    GPU -->|"2. Recommend Model Tier (Gemma 4 12B)"| UI
+    UI -->|"3. User Clicks '⚡ Launch Ollama'"| BRIDGE
+    BRIDGE -->|"4. Spawn Detached Process"| OLLAMA
+    UI <-->|"5. Streaming Chat & JSON Rubric Grading (port 11434)"| OLLAMA
+```
 
 ```
-                      +-------------------------------------------------------+
-                      |                   BrainStudy UI                       |
-                      |  (Socratic Drawer / AI Quiz / Clinical Case / Radar)  |
-                      +---------------------------+---------------------------+
-                                                  |
-                     +----------------------------+----------------------------+
-                     |                                                         |
-         [Client-Side Direct Pings]                              [Local Server API Routes]
-         - Ollama API (http://127.0.0.1:11434)                  - /api/system/gpu
-         - WebGL/WebGPU VRAM Estimation                         - /api/system/ollama/status
-                                                                - /api/system/ollama/launch
-                                                                - /api/system/ollama/chat
-                                                                - /api/system/ollama/pull
-                                                                            |
-                                                             +--------------+--------------+
-                                                             |  Local OS / Hardware Bridge |
-                                                             |  - nvidia-smi / powershell  |
-                                                             |  - child_process.spawn      |
-                                                             +--------------+--------------+
-                                                                            |
-                                                                  +---------v--------+
-                                                                  |  Ollama Instance |
-                                                                  |  (Gemma 4 12B,   |
-                                                                  |   Gemma 4 e4b,   |
-                                                                  |   Llama 3.1/3.3) |
-                                                                  +------------------+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                           BrainStudy Web UI                             │
+│       (3D Anatomy Viewer / Socratic Drawer / AI Quiz / Clinical Case)   │
+└────────────────────────────────────┬────────────────────────────────────┘
+                                     │
+           ┌─────────────────────────┴─────────────────────────┐
+           │                                                   │
+  [Client WebGL/WebGPU Diagnostic]                     [Local Server API Proxy]
+  - UNMASKED_RENDERER_WEBGL                            - /api/system/gpu
+  - Direct Ping (http://127.0.0.1:11434)               - /api/system/ollama/status
+                                                       - /api/system/ollama/launch
+                                                       - /api/system/ollama/chat
+                                                       - /api/system/ollama/pull
+                                                                   │
+                                                                   ▼
+                                                       [Host OS Hardware Bridge]
+                                                       - nvidia-smi / powershell
+                                                       - child_process.spawn()
+                                                                   │
+                                                                   ▼
+                                                       [Local Ollama Instance]
+                                                       (Gemma 4 12B / Gemma 4 e4b)
 ```
 
 ---
 
-## ✨ Features at a Glance
+## ✨ Core Feature Highlights
 
 ### 🧠 3D Neuroanatomy Laboratory
 * **BigBrain Histological Surface**: High-detail bilateral 3D cortical meshes preserving natural sulcal and gyral topography.
@@ -82,7 +108,7 @@
 
 ---
 
-## 📊 Anatomy Layer & Provenance Comparison Matrix
+## 📊 Anatomy Layer & Provenance Matrix
 
 | Layer Name | Provenance Grade | Primary Focus | Scientific Boundary / Limit |
 |---|---|---|---|
@@ -92,7 +118,7 @@
 
 ---
 
-## 📝 Example AI Socratic Evaluation Output
+## 📝 Example AI Socratic Rubric Evaluation Output
 
 When submitting a short-answer response to Medulla AI, the local LLM evaluates your input using native Ollama JSON Schemas:
 
@@ -192,12 +218,13 @@ BrainStudy automatically measures your GPU VRAM:
 
 If you find BrainStudy helpful for your neuroanatomy studies or research, consider supporting development!
 
+<div align="center">
+
 <a href="https://buymeacoffee.com/rorrimaesu" target="_blank">
-  <img src="https://img.shields.io/badge/☕_BUY_ME_A_COFFEE-Support_BrainStudy-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black" alt="Buy Me A Coffee" />
+  <img src="https://img.shields.io/badge/%E2%98%95%20Buy%20Me%20A%20Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black" alt="Buy Me A Coffee" />
 </a>
 
----
+<br /><br />
+<small>Designed & Developed with ❤️ by <b>RorriMaesu</b></small>
 
-<div align="center">
-  <small>Designed & Developed with ❤️ by <b>RorriMaesu</b></small>
 </div>
