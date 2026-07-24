@@ -226,6 +226,22 @@ Grade the student's answer using the requested JSON format. Evaluate anatomical 
     }
   };
 
+  const handleClearChat = () => {
+    if (selectedStructure) {
+      setMessages([
+        {
+          id: `welcome-${Date.now()}`,
+          role: "assistant",
+          content: `Greetings! I am **Medulla AI**, your Socratic neuroanatomy tutor. We are currently focusing on the **${selectedStructure.name}** (${selectedStructure.layer}).\n\nWhat would you like to explore first about its functional connections, clinical localization, or physiological role?`,
+          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        },
+      ]);
+    } else {
+      setMessages([]);
+    }
+    setInputMessage("");
+  };
+
   return (
     <div className="socratic-drawer-overlay" onClick={onClose}>
       <aside className="socratic-drawer" onClick={(e) => e.stopPropagation()}>
@@ -240,9 +256,14 @@ Grade the student's answer using the requested JSON format. Evaluate anatomical 
               </p>
             </div>
           </div>
-          <button className="drawer-close-btn" onClick={onClose} aria-label="Close drawer">
-            ×
-          </button>
+          <div className="drawer-header-actions">
+            <button className="clear-chat-btn" onClick={handleClearChat} title="Clear conversation history">
+              🗑️ Clear Chat
+            </button>
+            <button className="drawer-close-btn" onClick={onClose} aria-label="Close drawer">
+              ×
+            </button>
+          </div>
         </header>
 
         {/* Drawer Navigation Tabs */}
@@ -288,6 +309,9 @@ Grade the student's answer using the requested JSON format. Evaluate anatomical 
                 }
               >
                 🔗 Neural Connections
+              </button>
+              <button className="chip-clear-btn" onClick={handleClearChat} title="Clear current chat messages">
+                🗑️ Clear
               </button>
             </div>
 
