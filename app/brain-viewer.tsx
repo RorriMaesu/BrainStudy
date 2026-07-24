@@ -140,23 +140,32 @@ function CameraRig({
   const controls = useRef<OrbitControlsImpl | null>(null);
   const goal = useRef(new THREE.Vector3(...CAMERA_PRESETS[preset].position));
   const moving = useRef(true);
+  const settleFrames = useRef(0);
 
   useEffect(() => {
     goal.current.set(...CAMERA_PRESETS[preset].position);
     camera.up.set(...CAMERA_PRESETS[preset].up);
     moving.current = true;
+    settleFrames.current = 0;
     onMovingChange(true);
   }, [camera, onMovingChange, preset]);
 
   useFrame(() => {
-    if (!moving.current) return;
-    camera.position.lerp(goal.current, 0.085);
-    camera.lookAt(0, -0.02, 0);
-    controls.current?.target.lerp(new THREE.Vector3(0, -0.02, 0), 0.12);
-    controls.current?.update();
-    if (camera.position.distanceTo(goal.current) < 0.012) {
-      moving.current = false;
-      onMovingChange(false);
+    if (moving.current) {
+      camera.position.lerp(goal.current, 0.085);
+      camera.lookAt(0, -0.02, 0);
+      controls.current?.target.lerp(new THREE.Vector3(0, -0.02, 0), 0.12);
+      controls.current?.update();
+      if (camera.position.distanceTo(goal.current) < 0.012) {
+        moving.current = false;
+        onMovingChange(false);
+      }
+      return;
+    }
+
+    if (settleFrames.current > 0) {
+      settleFrames.current -= 1;
+      if (settleFrames.current === 0) onMovingChange(false);
     }
   });
 
@@ -173,9 +182,12 @@ function CameraRig({
       enableDamping
       onStart={() => {
         moving.current = false;
+        settleFrames.current = 0;
         onMovingChange(true);
       }}
-      onEnd={() => onMovingChange(false)}
+      onEnd={() => {
+        settleFrames.current = 10;
+      }}
     />
   );
 }
