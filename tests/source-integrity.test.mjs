@@ -53,9 +53,13 @@ test("the annotation system is camera-aware, bilateral and collision-managed", a
   assert.match(scene, /labelViews:/);
   assert.match(scene, /bestView:/);
   assert.match(viewer, /function AnnotationProjector/);
-  assert.match(viewer, /intersectObjects\(occluders\.current/);
+  assert.doesNotMatch(viewer, /new THREE\.Raycaster|intersectObjects\(/);
+  assert.match(viewer, /if \(suspended\) return/);
+  assert.match(viewer, /projectionDirty\.current/);
   assert.match(viewer, /function packLane/);
   assert.match(viewer, /function AnnotationOverlay/);
+  assert.match(viewer, /frames=\{1\}/);
+  assert.match(viewer, /resolution=\{256\}/);
   assert.doesNotMatch(viewer, /<Html\b/);
   assert.match(page, /LABEL_DENSITIES[\s\S]*"off"[\s\S]*"focus"[\s\S]*"key"[\s\S]*"all"/);
   assert.match(css, /\.annotation-card\.is-left/);

@@ -21,6 +21,16 @@ import {
 
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 const assetPath = (path: string) => `${BASE_PATH}${path}`;
+const CAMERA_TARGET = new THREE.Vector3(0, -0.02, 0);
+const CAMERA_DIRECTION_ENTRIES = (
+  Object.entries(CAMERA_PRESETS) as [
+    CameraPreset,
+    (typeof CAMERA_PRESETS)[CameraPreset],
+  ][]
+).map(([preset, config]) => [
+  preset,
+  new THREE.Vector3(...config.position).normalize(),
+] as const);
 
 export type SectionPlane = "sagittal" | "coronal" | "axial";
 export type HemisphereMode = "both" | "left" | "right";
@@ -114,11 +124,7 @@ function closestCameraPreset(camera: THREE.Camera): CameraPreset {
   let closest: CameraPreset = "lateral";
   let closestDot = -Infinity;
 
-  for (const [preset, config] of Object.entries(CAMERA_PRESETS) as [
-    CameraPreset,
-    (typeof CAMERA_PRESETS)[CameraPreset],
-  ][]) {
-    const presetDirection = new THREE.Vector3(...config.position).normalize();
+  for (const [preset, presetDirection] of CAMERA_DIRECTION_ENTRIES) {
     const dot = direction.dot(presetDirection);
     if (dot > closestDot) {
       closest = preset;
@@ -153,8 +159,8 @@ function CameraRig({
   useFrame(() => {
     if (moving.current) {
       camera.position.lerp(goal.current, 0.085);
-      camera.lookAt(0, -0.02, 0);
-      controls.current?.target.lerp(new THREE.Vector3(0, -0.02, 0), 0.12);
+      camera.lookAt(CAMERA_TARGET);
+      controls.current?.target.lerp(CAMERA_TARGET, 0.12);
       controls.current?.update();
       if (camera.position.distanceTo(goal.current) < 0.012) {
         moving.current = false;
@@ -252,7 +258,6 @@ function Hemisphere({
       });
       child.castShadow = false;
       child.receiveShadow = true;
-      child.userData.labelOccluder = true;
       child.material = material;
       materials.push(material);
     });
@@ -633,6 +638,7 @@ function AnnotationProjector({
   labelDensity,
   hemisphere,
   separation,
+  suspended,
   onUpdate,
 }: {
   mode: ViewMode;
@@ -640,22 +646,39 @@ function AnnotationProjector({
   labelDensity: LabelDensity;
   hemisphere: HemisphereMode;
   separation: number;
+  suspended: boolean;
   onUpdate: (frame: AnnotationFrame) => void;
 }) {
-  const { camera, scene, size } = useThree();
-  const occluders = useRef<THREE.Mesh[]>([]);
-  const raycaster = useRef(new THREE.Raycaster());
+  const { camera, size } = useThree();
   const lastSignature = useRef("");
-  const lastUpdate = useRef(0);
+  const projectionDirty = useRef(true);
+  const lastCameraPosition = useRef(new THREE.Vector3(Number.POSITIVE_INFINITY, 0, 0));
+  const lastCameraQuaternion = useRef(new THREE.Quaternion());
 
   useEffect(() => {
-    occluders.current = [];
-    lastSignature.current = "";
-  }, [hemisphere, mode]);
+    projectionDirty.current = true;
+  }, [
+    hemisphere,
+    labelDensity,
+    mode,
+    selectedId,
+    separation,
+    size.height,
+    size.width,
+    suspended,
+  ]);
 
-  useFrame(({ clock }) => {
-    if (clock.elapsedTime - lastUpdate.current < 1 / 24) return;
-    lastUpdate.current = clock.elapsedTime;
+  useFrame(() => {
+    if (suspended) return;
+
+    const cameraMoved =
+      lastCameraPosition.current.distanceToSquared(camera.position) > 0.000001
+      || 1 - Math.abs(lastCameraQuaternion.current.dot(camera.quaternion)) > 0.000001;
+    if (!projectionDirty.current && !cameraMoved) return;
+
+    projectionDirty.current = false;
+    lastCameraPosition.current.copy(camera.position);
+    lastCameraQuaternion.current.copy(camera.quaternion);
 
     if (labelDensity === "off") {
       const signature = `off-${size.width}-${size.height}`;
@@ -666,15 +689,6 @@ function AnnotationProjector({
       return;
     }
 
-    if (!occluders.current.length) {
-      scene.traverse((child) => {
-        if (child instanceof THREE.Mesh && child.userData.labelOccluder) {
-          occluders.current.push(child);
-        }
-      });
-    }
-
-    scene.updateMatrixWorld();
     const activePreset = closestCameraPreset(camera);
     const projected: ProjectedAnnotation[] = [];
 
@@ -689,17 +703,6 @@ function AnnotationProjector({
       for (const anchor of anchors) {
         const toCamera = camera.position.clone().sub(anchor.position).normalize();
         if (mode === "surface" && anchor.normal.dot(toCamera) < 0.06) continue;
-
-        if (mode === "surface" && occluders.current.length) {
-          const direction = anchor.position.clone().sub(camera.position);
-          const anchorDistance = direction.length();
-          raycaster.current.set(camera.position, direction.normalize());
-          const blocked = raycaster.current
-            .intersectObjects(occluders.current, false)
-            .some((hit) => hit.distance < anchorDistance - 0.1);
-          if (blocked) continue;
-        }
-
         visibleAnchor = anchor;
         break;
       }
@@ -738,7 +741,7 @@ function AnnotationProjector({
         ? ranked.filter((annotation) => annotation.selected || annotation.priority === 1).slice(0, 6)
         : ranked.slice(0, 10);
 
-    const signature = `${activePreset}-${size.width}-${size.height}-${visible
+    const signature = `${labelDensity}-${selectedId}-${hemisphere}-${activePreset}-${size.width}-${size.height}-${visible
       .map((annotation) => `${annotation.key}:${Math.round(annotation.x / 2)}:${Math.round(annotation.y / 2)}`)
       .join("|")}`;
     if (signature !== lastSignature.current) {
@@ -863,10 +866,20 @@ function Scene({
   onSelect,
   onAnnotations,
   onCameraMoving,
+  cameraMoving,
 }: ViewerProps & {
   onAnnotations: (frame: AnnotationFrame) => void;
   onCameraMoving: (moving: boolean) => void;
+  cameraMoving: boolean;
 }) {
+  const shadowStateKey = [
+    mode,
+    hemisphere,
+    sectionPlane,
+    Math.round(separation * 20),
+    Math.round(section * 20),
+  ].join("-");
+
   return (
     <>
       <CameraRig preset={cameraPreset} onMovingChange={onCameraMoving} />
@@ -915,10 +928,21 @@ function Scene({
         labelDensity={labelDensity}
         hemisphere={hemisphere}
         separation={separation}
+        suspended={cameraMoving}
         onUpdate={onAnnotations}
       />
 
-      <ContactShadows position={[0, 0, -0.72]} rotation={[0, 0, 0]} opacity={0.22} scale={2.6} blur={2.8} far={2.4} />
+      <ContactShadows
+        key={shadowStateKey}
+        position={[0, 0, -0.72]}
+        rotation={[0, 0, 0]}
+        opacity={0.22}
+        scale={2.6}
+        blur={2.8}
+        far={2.4}
+        frames={1}
+        resolution={256}
+      />
     </>
   );
 }
@@ -1003,6 +1027,7 @@ export default function BrainViewer(props: ViewerProps) {
             {...props}
             onAnnotations={handleAnnotations}
             onCameraMoving={handleCameraMoving}
+            cameraMoving={cameraMoving}
           />
         </Suspense>
       </Canvas>
