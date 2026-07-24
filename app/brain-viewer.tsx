@@ -15,6 +15,9 @@ import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import { REGION_MAP, type ViewMode } from "./brain-data";
 import { CAMERA_PRESETS, SCENE_REGIONS, type CameraPreset } from "./scene-data";
 
+const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+const assetPath = (path: string) => `${BASE_PATH}${path}`;
+
 export type SectionPlane = "sagittal" | "coronal" | "axial";
 export type HemisphereMode = "both" | "left" | "right";
 
@@ -96,7 +99,7 @@ function Hemisphere({
   sectionPlane: SectionPlane;
   onSelect: (id: string) => void;
 }) {
-  const { scene } = useGLTF(`/models/bigbrain-${side}.glb`);
+  const { scene } = useGLTF(assetPath(`/models/bigbrain-${side}.glb`));
   const clone = useMemo(() => scene.clone(true), [scene]);
   const clippingPlane = useRef(new THREE.Plane(new THREE.Vector3(-1, 0, 0), 10));
 
@@ -597,7 +600,7 @@ export default function BrainViewer(props: ViewerProps) {
     return (
       <div className={`viewer-canvas webgl-fallback ${webglAvailable === null ? "is-checking" : ""}`}>
         <Image
-          src="/images/brainstudy-cortex.png"
+          src={assetPath("/images/brainstudy-cortex.png")}
           alt="Atlas-derived lateral cerebral cortical surface with color-coded lobes"
           fill
           priority
@@ -654,5 +657,5 @@ export default function BrainViewer(props: ViewerProps) {
   );
 }
 
-useGLTF.preload("/models/bigbrain-left.glb");
-useGLTF.preload("/models/bigbrain-right.glb");
+useGLTF.preload(assetPath("/models/bigbrain-left.glb"));
+useGLTF.preload(assetPath("/models/bigbrain-right.glb"));
