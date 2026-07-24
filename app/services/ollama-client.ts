@@ -116,11 +116,21 @@ export class OllamaClient {
     onProgress: (status: string, percent?: number) => void,
   ): Promise<boolean> {
     try {
-      const res = await fetch("/api/system/ollama/pull", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model: modelName }),
-      });
+      let res: Response;
+      try {
+        res = await fetch("/api/system/ollama/pull", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ model: modelName }),
+        });
+      } catch {
+        // Direct browser fallback for static hostings (GitHub Pages)
+        res = await fetch(`${this.defaultHost}/api/pull`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: modelName, stream: true }),
+        });
+      }
 
       if (!res.ok || !res.body) return false;
 
@@ -175,11 +185,25 @@ export class OllamaClient {
       };
       if (format) payload.format = format;
 
-      const response = await fetch("/api/system/ollama/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      let response: Response;
+      try {
+        response = await fetch("/api/system/ollama/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok && response.status === 404) {
+          throw new Error("Server route 404, fallback to direct browser fetch");
+        }
+      } catch {
+        // Direct browser fetch to local Ollama instance for static deployments (GitHub Pages)
+        response = await fetch(`${this.defaultHost}/api/chat`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      }
 
       if (!response.ok) {
         throw new Error(`Ollama chat error HTTP ${response.status}`);
