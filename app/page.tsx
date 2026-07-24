@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import BrainViewer, {
+  type CameraView,
   type HemisphereMode,
   type LabelDensity,
   type SectionPlane,
@@ -71,6 +72,8 @@ export default function Home() {
   const [sectionPlane, setSectionPlane] = useState<SectionPlane>("sagittal");
   const [hemisphere, setHemisphere] = useState<HemisphereMode>("both");
   const [cameraPreset, setCameraPreset] = useState<CameraPreset>("lateral");
+  const [cameraCommandId, setCameraCommandId] = useState(0);
+  const [cameraView, setCameraView] = useState<CameraView>("lateral");
   const [quizMode, setQuizMode] = useState(false);
   const [quizTarget, setQuizTarget] = useState("frontal");
   const [quizMessage, setQuizMessage] = useState("");
@@ -79,6 +82,15 @@ export default function Home() {
   const recentQuizTargets = useRef<string[]>([]);
   const quizSeed = useRef(0x9e3779b9);
   const methodsDialog = useRef<HTMLElement | null>(null);
+
+  const requestCameraView = useCallback((preset: CameraPreset) => {
+    setCameraPreset(preset);
+    setCameraCommandId((current) => current + 1);
+    if (preset === "medial") {
+      setHemisphere("left");
+      setSeparation((current) => Math.max(current, 0.22));
+    }
+  }, []);
 
   const visibleRegions = useMemo(
     () => REGIONS.filter((region) => region.view.includes(mode)),
@@ -119,7 +131,7 @@ export default function Home() {
     setHemisphere(next === "surface" ? "both" : "left");
     setSeparation(next === "deep" ? 0.18 : 0);
     setColorized(next !== "deep");
-    setCameraPreset(next === "surface" ? "lateral" : "medial");
+    requestCameraView(next === "surface" ? "lateral" : "medial");
   };
 
   const handleSelect = (id: string) => {
@@ -137,8 +149,8 @@ export default function Home() {
     setDetailTab("overview");
     const sceneRegion = SCENE_REGION_MAP[id];
     if (sceneRegion) {
-      if (!sceneRegion.labelViews.includes(cameraPreset)) {
-        setCameraPreset(sceneRegion.bestView);
+      if (cameraView !== "free" && !sceneRegion.labelViews.includes(cameraView)) {
+        requestCameraView(sceneRegion.bestView);
       }
       if (sceneRegion.laterality === "left" && hemisphere === "right") {
         setHemisphere("left");
@@ -170,7 +182,7 @@ export default function Home() {
         setSeparation(0);
         setSectionPlane("sagittal");
         setHemisphere("both");
-        setCameraPreset("lateral");
+        requestCameraView("lateral");
       }
       if (event.key === "Escape") {
         if (showSources) setShowSources(false);
@@ -179,7 +191,7 @@ export default function Home() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [quizMode, showSources]);
+  }, [quizMode, requestCameraView, showSources]);
 
   useEffect(() => {
     if (!showSources) return;
@@ -274,7 +286,11 @@ export default function Home() {
         <section className="anatomy-stage">
           <div className="stage-head">
             <div className="stage-context">
-              <span>{VIEW_INFO[mode].eyebrow}</span>
+              <span>
+                Layer {LAYER_COPY[mode].index} · {cameraView === "free"
+                  ? "Free orbit"
+                  : `${CAMERA_PRESETS[cameraView].label} view`}
+              </span>
               <strong>{VIEW_INFO[mode].description}</strong>
             </div>
             <div className="stage-badges">
@@ -296,7 +312,10 @@ export default function Home() {
             sectionPlane={sectionPlane}
             hemisphere={hemisphere}
             cameraPreset={cameraPreset}
+            cameraCommandId={cameraCommandId}
             onSelect={handleSelect}
+            onCameraViewChange={setCameraView}
+            onRequestView={requestCameraView}
           />
 
           {mode === "systems" && (
@@ -321,18 +340,14 @@ export default function Home() {
           )}
 
           <div className="camera-dock">
-            <span>Camera</span>
+            <span className={cameraView === "free" ? "is-free" : ""}>
+              {cameraView === "free" ? "Free orbit" : "Camera"}
+            </span>
             {(Object.keys(CAMERA_PRESETS) as CameraPreset[]).map((preset) => (
               <button
                 key={preset}
-                className={cameraPreset === preset ? "active" : ""}
-                onClick={() => {
-                  setCameraPreset(preset);
-                  if (preset === "medial") {
-                    setHemisphere("left");
-                    setSeparation((current) => Math.max(current, 0.22));
-                  }
-                }}
+                className={cameraView === preset ? "active" : ""}
+                onClick={() => requestCameraView(preset)}
                 title={`${CAMERA_PRESETS[preset].label} view`}
               >
                 {CAMERA_PRESETS[preset].label}
@@ -472,7 +487,7 @@ export default function Home() {
                   setSection(0);
                   setSectionPlane("sagittal");
                   setHemisphere("both");
-                  setCameraPreset("lateral");
+                  requestCameraView("lateral");
                   setLabelDensity("key");
                 }}
               >

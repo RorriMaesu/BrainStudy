@@ -13,6 +13,14 @@ export type RegionLaterality = "bilateral" | "left" | "midline";
 export type SceneRegion = {
   id: string;
   position: [number, number, number];
+  sidePositions?: {
+    left: [number, number, number];
+    right: [number, number, number];
+  };
+  viewPositions?: Partial<Record<CameraPreset, {
+    left: [number, number, number];
+    right: [number, number, number];
+  }>>;
   layers: ViewMode[];
   laterality: RegionLaterality;
   priority: 1 | 2 | 3;
@@ -21,14 +29,14 @@ export type SceneRegion = {
 };
 
 export const SCENE_REGIONS: SceneRegion[] = [
-  { id: "frontal", position: [0.70, 0.43, 0.12], layers: ["surface", "systems"], laterality: "bilateral", priority: 1, labelViews: ["lateral", "anterior", "superior"], bestView: "lateral" },
-  { id: "parietal", position: [0.67, -0.18, 0.34], layers: ["surface", "systems"], laterality: "bilateral", priority: 1, labelViews: ["lateral", "posterior", "superior"], bestView: "lateral" },
-  { id: "temporal", position: [0.70, 0.12, -0.25], layers: ["surface", "systems"], laterality: "bilateral", priority: 1, labelViews: ["lateral", "inferior"], bestView: "lateral" },
-  { id: "occipital", position: [0.55, -0.69, 0.04], layers: ["surface", "systems"], laterality: "bilateral", priority: 1, labelViews: ["lateral", "posterior", "superior"], bestView: "posterior" },
-  { id: "motor-cortex", position: [0.72, 0.08, 0.31], layers: ["surface", "systems"], laterality: "bilateral", priority: 1, labelViews: ["lateral", "superior"], bestView: "superior" },
-  { id: "somatosensory", position: [0.72, -0.05, 0.33], layers: ["surface", "systems"], laterality: "bilateral", priority: 1, labelViews: ["lateral", "superior"], bestView: "superior" },
-  { id: "broca", position: [0.69, 0.42, -0.08], layers: ["surface", "systems"], laterality: "left", priority: 2, labelViews: ["lateral"], bestView: "lateral" },
-  { id: "wernicke", position: [0.68, -0.34, -0.08], layers: ["surface", "systems"], laterality: "left", priority: 2, labelViews: ["lateral"], bestView: "lateral" },
+  { id: "frontal", position: [0.70, 0.43, 0.12], sidePositions: { left: [0.693, 0.420, 0.121], right: [-0.644, 0.418, 0.093] }, viewPositions: { anterior: { left: [0.3090, 0.7468, 0.1220], right: [-0.3125, 0.7534, 0.1157] }, superior: { left: [0.3383, 0.3546, 0.4811], right: [-0.3414, 0.3423, 0.4182] } }, layers: ["surface", "systems"], laterality: "bilateral", priority: 1, labelViews: ["lateral", "anterior", "superior"], bestView: "lateral" },
+  { id: "parietal", position: [0.67, -0.18, 0.34], sidePositions: { left: [0.619, -0.176, 0.325], right: [-0.586, -0.102, 0.254] }, viewPositions: { posterior: { left: [0.3569, -0.4611, 0.2735], right: [-0.3469, -0.4512, 0.2829] }, superior: { left: [0.3717, -0.1788, 0.4561], right: [-0.3278, -0.1794, 0.4252] } }, layers: ["surface", "systems"], laterality: "bilateral", priority: 1, labelViews: ["lateral", "posterior", "superior"], bestView: "lateral" },
+  { id: "temporal", position: [0.70, 0.12, -0.25], sidePositions: { left: [0.716, 0.132, -0.254], right: [-0.699, 0.116, -0.264] }, viewPositions: { inferior: { left: [0.4257, 0.0363, -0.4845], right: [-0.4072, 0.0009, -0.4437] } }, layers: ["surface", "systems"], laterality: "bilateral", priority: 1, labelViews: ["lateral", "inferior"], bestView: "lateral" },
+  { id: "occipital", position: [0.55, -0.69, 0.04], sidePositions: { left: [0.507, -0.667, 0.039], right: [-0.509, -0.625, 0.007] }, viewPositions: { posterior: { left: [0.3230, -0.7934, 0.0580], right: [-0.2923, -0.7763, 0.0445] }, superior: { left: [0.2913, -0.6044, 0.3038], right: [-0.2360, -0.5847, 0.2770] } }, layers: ["surface", "systems"], laterality: "bilateral", priority: 1, labelViews: ["lateral", "posterior", "superior"], bestView: "posterior" },
+  { id: "motor-cortex", position: [0.72, 0.08, 0.31], sidePositions: { left: [0.706, 0.071, 0.309], right: [-0.614, 0.054, 0.236] }, viewPositions: { superior: { left: [0.3174, 0.0782, 0.5016], right: [-0.2997, 0.0684, 0.4689] } }, layers: ["surface", "systems"], laterality: "bilateral", priority: 1, labelViews: ["lateral", "superior"], bestView: "superior" },
+  { id: "somatosensory", position: [0.72, -0.05, 0.33], sidePositions: { left: [0.697, -0.040, 0.323], right: [-0.618, -0.054, 0.227] }, viewPositions: { superior: { left: [0.3158, -0.0590, 0.4938], right: [-0.3019, -0.0169, 0.4552] } }, layers: ["surface", "systems"], laterality: "bilateral", priority: 1, labelViews: ["lateral", "superior"], bestView: "superior" },
+  { id: "broca", position: [0.69, 0.42, -0.08], sidePositions: { left: [0.708, 0.438, -0.094], right: [-0.690, 0.420, -0.080] }, layers: ["surface", "systems"], laterality: "left", priority: 2, labelViews: ["lateral"], bestView: "lateral" },
+  { id: "wernicke", position: [0.68, -0.34, -0.08], sidePositions: { left: [0.683, -0.342, -0.083], right: [-0.680, -0.340, -0.080] }, layers: ["surface", "systems"], laterality: "left", priority: 2, labelViews: ["lateral"], bestView: "lateral" },
   { id: "corpus-callosum", position: [0, -0.03, 0.18], layers: ["deep", "systems"], laterality: "midline", priority: 1, labelViews: ["medial", "superior"], bestView: "medial" },
   { id: "thalamus", position: [0.12, -0.03, 0.01], layers: ["deep", "systems"], laterality: "bilateral", priority: 1, labelViews: ["medial", "superior"], bestView: "medial" },
   { id: "hypothalamus", position: [0, 0.08, -0.15], layers: ["deep", "systems"], laterality: "midline", priority: 2, labelViews: ["medial", "inferior"], bestView: "medial" },
