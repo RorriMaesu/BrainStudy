@@ -21,14 +21,11 @@ import {
   SCENE_REGION_MAP,
   type CameraPreset,
 } from "./scene-data";
-import {
-  SCIENCE_SOURCES,
-  VIEW_AUTHORITY,
-  authorityForRegion,
-  sourcesFor,
-} from "./science-authority";
+import { SCIENCE_SOURCES, VIEW_AUTHORITY, authorityForRegion, sourcesFor } from "./science-authority";
+import { OllamaStatusBadge } from "./components/ollama-status-badge";
+import { SocraticAIDrawer } from "./components/socratic-ai-drawer";
 
-type DetailTab = "overview" | "connections" | "clinical" | "evidence";
+type DetailTab = "overview" | "connections" | "clinical" | "evidence" | "socratic";
 const LABEL_DENSITIES: LabelDensity[] = ["off", "focus", "key", "all"];
 
 const LAYER_COPY: Record<ViewMode, { index: string; title: string; subtitle: string }> = {
@@ -79,6 +76,8 @@ export default function Home() {
   const [quizMessage, setQuizMessage] = useState("");
   const [score, setScore] = useState({ correct: 0, total: 0 });
   const [showSources, setShowSources] = useState(false);
+  const [isAIDrawerOpen, setIsAIDrawerOpen] = useState(false);
+  const [activeModel, setActiveModel] = useState("gemma4:12b");
   const recentQuizTargets = useRef<string[]>([]);
   const quizSeed = useRef(0x9e3779b9);
   const methodsDialog = useRef<HTMLElement | null>(null);
@@ -221,6 +220,14 @@ export default function Home() {
           ))}
         </nav>
         <div className="header-actions">
+          <OllamaStatusBadge
+            onOpenHardwareDrawer={() => setIsAIDrawerOpen(true)}
+            activeModel={activeModel}
+            onSelectModel={setActiveModel}
+          />
+          <button className="socratic-trigger-btn launch-quick-btn" onClick={() => setIsAIDrawerOpen(true)}>
+            🧠 Medulla AI Studio
+          </button>
           <button className={`quiz-button ${quizMode ? "active" : ""}`} onClick={toggleQuiz}>
             <Icon name="quiz" />
             {quizMode ? "Exit assessment" : "Test yourself"}
@@ -374,7 +381,7 @@ export default function Home() {
             </button>
 
             <div className="detail-tabs" role="tablist">
-              {(["overview", "connections", "clinical", "evidence"] as DetailTab[]).map((tab) => (
+              {(["overview", "connections", "clinical", "evidence", "socratic"] as DetailTab[]).map((tab) => (
                 <button
                   key={tab}
                   role="tab"
@@ -382,10 +389,26 @@ export default function Home() {
                   className={detailTab === tab ? "active" : ""}
                   onClick={() => setDetailTab(tab)}
                 >
-                  {tab}
+                  {tab === "socratic" ? "🧠 socratic" : tab}
                 </button>
               ))}
             </div>
+
+            {detailTab === "socratic" && (
+              <div className="detail-content">
+                <section>
+                  <span>Socratic AI Assistant</span>
+                  <p>Engage in guided discovery, clinical localization drills, and adaptive reasoning about the {selected.name}.</p>
+                </section>
+                <button
+                  className="primary-action-btn"
+                  style={{ width: "100%", padding: "12px", background: "var(--cyan)", color: "#000", fontWeight: 700, borderRadius: "10px", border: "none", cursor: "pointer" }}
+                  onClick={() => setIsAIDrawerOpen(true)}
+                >
+                  🚀 Open Medulla AI Studio for {selected.name}
+                </button>
+              </div>
+            )}
 
             {detailTab === "overview" && (
               <div className="detail-content">
@@ -645,6 +668,25 @@ export default function Home() {
           </section>
         </div>
       )}
+      <SocraticAIDrawer
+        isOpen={isAIDrawerOpen}
+        onClose={() => setIsAIDrawerOpen(false)}
+        selectedStructure={{
+          id: selected.id,
+          name: selected.name,
+          role: selected.role,
+          location: selected.location,
+          detail: selected.detail,
+          memory: selected.memory,
+          system: SYSTEMS[selected.system]?.label ?? selected.system,
+          layer: LAYER_COPY[mode]?.title ?? mode,
+          connections: academic?.connections,
+          clinical: academic?.clinical,
+          evidenceGrade: authority.grade,
+        }}
+        activeModel={activeModel}
+        onSelectModel={setActiveModel}
+      />
     </main>
   );
 }
