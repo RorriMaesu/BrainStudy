@@ -1026,6 +1026,7 @@ function Scene({
   sectionPlane,
   hemisphere,
   cameraPreset,
+  cameraCommandId,
   onSelect,
   onAnnotations,
   onCameraMoving,
