@@ -439,6 +439,76 @@ function TubeStructure({
   );
 }
 
+function AnatomicalModelPart({
+  id,
+  modelPath,
+  position,
+  scale = [1, 1, 1],
+  selectedId,
+  onSelect,
+}: {
+  id: string;
+  modelPath: string;
+  position: [number, number, number];
+  scale?: [number, number, number];
+  selectedId: string;
+  onSelect: (id: string) => void;
+}) {
+  const { scene } = useGLTF(assetPath(modelPath));
+  const clone = useMemo(() => {
+    const cloned = scene.clone(true);
+    cloned.traverse((child: THREE.Object3D) => {
+      if (!(child instanceof THREE.Mesh)) return;
+      if (!child.geometry.getAttribute("normal")) {
+        child.geometry.computeVertexNormals();
+      }
+    });
+    return cloned;
+  }, [scene]);
+
+  const selected = selectedId === id;
+  const color = REGION_MAP[id]?.color ?? "#aab7ca";
+
+  useEffect(() => {
+    clone.traverse((child: THREE.Object3D) => {
+      if (!(child instanceof THREE.Mesh)) return;
+      child.material = new THREE.MeshPhysicalMaterial({
+        color,
+        emissive: selected ? color : "#000000",
+        emissiveIntensity: selected ? 0.5 : 0.06,
+        roughness: 0.38,
+        metalness: 0.02,
+        clearcoat: 0.42,
+        clearcoatRoughness: 0.5,
+        side: THREE.DoubleSide,
+      });
+    });
+  }, [clone, id, selected, color]);
+
+  const [hovered, setHovered] = useState(false);
+
+  return (
+    <primitive
+      object={clone}
+      position={position}
+      scale={hovered && !selected ? scale.map((v) => v * 1.035) as [number, number, number] : scale}
+      onClick={(event: { stopPropagation: () => void }) => {
+        event.stopPropagation();
+        onSelect(id);
+      }}
+      onPointerEnter={(event: { stopPropagation: () => void }) => {
+        event.stopPropagation();
+        setHovered(true);
+        document.body.style.cursor = "pointer";
+      }}
+      onPointerLeave={() => {
+        setHovered(false);
+        document.body.style.cursor = "default";
+      }}
+    />
+  );
+}
+
 function Cerebellum({
   selectedId,
   onSelect,
@@ -447,22 +517,13 @@ function Cerebellum({
   onSelect: (id: string) => void;
 }) {
   return (
-    <Structure id="cerebellum" selectedId={selectedId} onSelect={onSelect}>
-      {[-0.22, 0.22].map((x) => (
-        <group key={x} position={[x, -0.55, -0.37]} scale={[0.25, 0.28, 0.22]}>
-          <mesh>
-            <sphereGeometry args={[1, 64, 40]} />
-            <AnatomyMaterial id="cerebellum" selected={selectedId === "cerebellum"} />
-          </mesh>
-          {[-0.68, -0.34, 0, 0.34, 0.68].map((z) => (
-            <mesh key={z} position={[0, 0, z * 0.72]} rotation={[Math.PI / 2, 0, 0]} scale={[0.88 - Math.abs(z) * 0.18, 0.88 - Math.abs(z) * 0.18, 1]}>
-              <torusGeometry args={[0.72, 0.018, 8, 64]} />
-              <meshBasicMaterial color="#5c342d" transparent opacity={0.38} />
-            </mesh>
-          ))}
-        </group>
-      ))}
-    </Structure>
+    <AnatomicalModelPart
+      id="cerebellum"
+      modelPath="/models/cerebellum.glb"
+      position={[0, -0.52, -0.36]}
+      selectedId={selectedId}
+      onSelect={onSelect}
+    />
   );
 }
 
@@ -479,17 +540,29 @@ function Brainstem({
     <group>
       {mode !== "surface" && (
         <>
-          <Structure id="midbrain" selectedId={selectedId} onSelect={onSelect} position={[0, -0.06, -0.24]} scale={[0.13, 0.13, 0.12]}>
-            <mesh><sphereGeometry args={[1, 48, 32]} /><AnatomyMaterial id="midbrain" selected={selectedId === "midbrain"} /></mesh>
-          </Structure>
-          <Structure id="pons" selectedId={selectedId} onSelect={onSelect} position={[0, -0.08, -0.39]} scale={[0.16, 0.13, 0.12]}>
-            <mesh><sphereGeometry args={[1, 48, 32]} /><AnatomyMaterial id="pons" selected={selectedId === "pons"} /></mesh>
-          </Structure>
+          <AnatomicalModelPart
+            id="midbrain"
+            modelPath="/models/midbrain.glb"
+            position={[0, -0.06, -0.24]}
+            selectedId={selectedId}
+            onSelect={onSelect}
+          />
+          <AnatomicalModelPart
+            id="pons"
+            modelPath="/models/pons.glb"
+            position={[0, -0.10, -0.39]}
+            selectedId={selectedId}
+            onSelect={onSelect}
+          />
         </>
       )}
-      <Structure id="medulla" selectedId={selectedId} onSelect={onSelect} position={[0, -0.09, -0.52]} scale={[0.09, 0.085, 0.21]}>
-        <mesh><capsuleGeometry args={[0.65, 1.25, 12, 28]} /><AnatomyMaterial id="medulla" selected={selectedId === "medulla"} /></mesh>
-      </Structure>
+      <AnatomicalModelPart
+        id="medulla"
+        modelPath="/models/medulla.glb"
+        position={[0, -0.10, -0.55]}
+        selectedId={selectedId}
+        onSelect={onSelect}
+      />
     </group>
   );
 }
@@ -1239,3 +1312,7 @@ export default function BrainViewer(props: ViewerProps) {
 
 useGLTF.preload(assetPath("/models/bigbrain-left.glb"));
 useGLTF.preload(assetPath("/models/bigbrain-right.glb"));
+useGLTF.preload(assetPath("/models/cerebellum.glb"));
+useGLTF.preload(assetPath("/models/midbrain.glb"));
+useGLTF.preload(assetPath("/models/pons.glb"));
+useGLTF.preload(assetPath("/models/medulla.glb"));

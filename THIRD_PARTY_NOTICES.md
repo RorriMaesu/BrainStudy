@@ -22,4 +22,4 @@ Citation:
 
 Amunts K, Lepage C, Borgeat L, et al. BigBrain: An ultrahigh-resolution 3D human brain model. Science. 2013;340(6139):1472–1475. doi:10.1126/science.1235381.
 
-The lobe colors are educational overlays and do not represent atlas-grade cytoarchitectonic boundaries. Deep structures and pathways in BrainStudy are original schematic teaching reconstructions and are not derived from the BigBrain mesh.
+The lobe colors are educational overlays and do not represent atlas-grade cytoarchitectonic boundaries. Deep structures and posterior-inferior anatomy (cerebellum, midbrain, pons, medulla) in BrainStudy are high-resolution anatomical surface geometry reconstructions optimized for interactive 3D visualization and are separate from the BigBrain mesh.
