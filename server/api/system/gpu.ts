@@ -1,11 +1,9 @@
 import { exec } from "child_process";
 import { promisify } from "util";
 
-export const dynamic = "force-static";
-
 const execAsync = promisify(exec);
 
-export async function GET() {
+export async function handleGpuRequest(): Promise<Response> {
   let gpuName = "Generic GPU";
   let vramGB = 8;
   let success = false;

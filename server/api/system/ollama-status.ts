@@ -1,11 +1,9 @@
 import { exec } from "child_process";
 import { promisify } from "util";
 
-export const dynamic = "force-static";
-
 const execAsync = promisify(exec);
 
-export async function GET() {
+export async function handleOllamaStatusRequest(): Promise<Response> {
   const defaultHost = "http://127.0.0.1:11434";
 
   // 1. Check HTTP service on port 11434

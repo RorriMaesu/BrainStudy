@@ -1,8 +1,6 @@
 import { spawn } from "child_process";
 
-export const dynamic = "force-static";
-
-export async function POST() {
+export async function handleOllamaLaunchRequest(): Promise<Response> {
   try {
     if (process.platform === "win32") {
       // Launch Ollama app or service on Windows detached

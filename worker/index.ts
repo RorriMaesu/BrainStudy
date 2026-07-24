@@ -1,6 +1,11 @@
 /** Cloudflare Worker entry point for the vinext-starter template. */
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
+import { handleGpuRequest } from "../server/api/system/gpu";
+import { handleOllamaStatusRequest } from "../server/api/system/ollama-status";
+import { handleOllamaLaunchRequest } from "../server/api/system/ollama-launch";
+import { handleOllamaChatRequest } from "../server/api/system/ollama-chat";
+import { handleOllamaPullRequest } from "../server/api/system/ollama-pull";
 
 interface Env {
   ASSETS: Fetcher;
@@ -19,12 +24,6 @@ interface ExecutionContext {
   passThroughOnException(): void;
 }
 
-// Image security config. SVG sources with .svg extension auto-skip the
-// optimization endpoint on the client side (served directly, no proxy).
-// To route SVGs through the optimizer (with security headers), set
-// dangerouslyAllowSVG: true in next.config.js and uncomment below:
-// const imageConfig: ImageConfig = { dangerouslyAllowSVG: true };
-
 const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
@@ -38,6 +37,22 @@ const worker = {
           return result.response();
         },
       }, allowedWidths);
+    }
+
+    if (url.pathname === "/api/system/gpu") {
+      return handleGpuRequest();
+    }
+    if (url.pathname === "/api/system/ollama/status") {
+      return handleOllamaStatusRequest();
+    }
+    if (url.pathname === "/api/system/ollama/launch") {
+      return handleOllamaLaunchRequest();
+    }
+    if (url.pathname === "/api/system/ollama/chat") {
+      return handleOllamaChatRequest(request);
+    }
+    if (url.pathname === "/api/system/ollama/pull") {
+      return handleOllamaPullRequest(request);
     }
 
     return handler.fetch(request, env, ctx);
