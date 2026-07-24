@@ -100,7 +100,16 @@ function Hemisphere({
   onSelect: (id: string) => void;
 }) {
   const { scene } = useGLTF(assetPath(`/models/bigbrain-${side}.glb`));
-  const clone = useMemo(() => scene.clone(true), [scene]);
+  const clone = useMemo(() => {
+    const corticalScene = scene.clone(true);
+    corticalScene.traverse((child: THREE.Object3D) => {
+      if (!(child instanceof THREE.Mesh)) return;
+      if (!child.geometry.getAttribute("normal")) {
+        child.geometry.computeVertexNormals();
+      }
+    });
+    return corticalScene;
+  }, [scene]);
   const clippingPlane = useRef(new THREE.Plane(new THREE.Vector3(-1, 0, 0), 10));
 
   useEffect(() => {
